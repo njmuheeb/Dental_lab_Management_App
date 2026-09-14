@@ -314,6 +314,7 @@ class DentalLabRepository(private val database: AppDatabase) {
             workType = workOrder.workTypeName,
             material = workOrder.material,
             shade = workOrder.shade,
+            selectedTeeth = workOrder.selectedTeeth,
             toothNumbers = ToothFormat.formatLong(workOrder.selectedTeeth),
             consultantDoctor = "Dr. ${workOrder.dentistName.ifBlank { clinic?.dentistName ?: "" }}",
             deliveryDate = delivery,

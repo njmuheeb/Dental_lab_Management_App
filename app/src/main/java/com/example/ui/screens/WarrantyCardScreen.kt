@@ -61,9 +61,11 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.WarrantyCard
 import com.example.data.model.WorkOrder
 import com.example.data.repository.DentalLabRepository
+import com.example.data.util.ToothFormat
 import com.example.export.FileExporter
 import com.example.export.WarrantyCardPdfExporter
 import com.example.ui.DentalLabViewModel
+import com.example.ui.components.DentalOdontogram
 import com.example.ui.components.WarrantyCardBackPreview
 import com.example.ui.components.WarrantyCardFrontPreview
 import com.example.ui.theme.DentalBlue
@@ -311,11 +313,25 @@ fun WarrantyCardScreen(
                         label = { Text("Material") },
                         singleLine = true, modifier = Modifier.fillMaxWidth()
                     )
-                    OutlinedTextField(
-                        value = c.toothNumbers,
-                        onValueChange = { card = c.copy(toothNumbers = it) },
-                        label = { Text("Tooth Number(s)") },
-                        singleLine = true, modifier = Modifier.fillMaxWidth()
+                    // Tooth selection via the four-quadrant odontogram (FDI stored,
+                    // human-readable quadrant text derived automatically)
+                    Text(
+                        "TOOTH NUMBER(S)",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Navy900
+                    )
+                    DentalOdontogram(
+                        selectedTeeth = ToothFormat.parse(
+                            c.selectedTeeth.ifBlank { ToothFormat.fdiFromQuadrantText(c.toothNumbers) }
+                        ).toSet(),
+                        onTeethChanged = { set ->
+                            val fdi = set.sorted().joinToString(",")
+                            card = c.copy(
+                                selectedTeeth = fdi,
+                                toothNumbers = ToothFormat.formatLong(fdi)
+                            )
+                        }
                     )
                     OutlinedTextField(
                         value = c.shade,

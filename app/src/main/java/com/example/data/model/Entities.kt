@@ -177,6 +177,7 @@ data class WarrantyCard(
     val workType: String = "",
     val material: String = "",
     val shade: String = "",
+    val selectedTeeth: String = "",    // raw FDI list e.g. "12,13,21,47" (drives the quadrant diagram)
     val toothNumbers: String = "",   // quadrant notation e.g. "UR: 1, 2 | LL: 6"
     val consultantDoctor: String = "",
     val deliveryDate: Long = System.currentTimeMillis(),

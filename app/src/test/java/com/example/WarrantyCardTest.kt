@@ -91,6 +91,8 @@ class WarrantyCardTest {
         assertEquals("Multilayer Zirconia", card.material)
         // Teeth stored in quadrant single-digit notation (never raw FDI)
         assertEquals("Upper Right: 1, 2", card.toothNumbers)
+        // Raw FDI list kept for the four-quadrant diagram
+        assertEquals("11,12", card.selectedTeeth)
         assertEquals("Dr. Sameer Khan", card.consultantDoctor)
         assertEquals(10, card.warrantyYears)
         assertTrue(card.cardNumber.startsWith("WC-"))

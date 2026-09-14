@@ -50,8 +50,9 @@ the optional Google Sheets mirror.
 - **Warranty cards** — a dedicated Warranty Cards screen (sidebar) with search and
   clinic/year/Active-Expired filters: create cards from an existing work order or by
   manual entry, preview both sides, and export an **exactly-two-page CR80/ID-1
-  (85.60 × 53.98 mm) PDF** (front + back) ready for front/back printing on card stock
-  at Actual Size.
+  (85.60 × 53.98 mm) PDF** (front + back) in a green-and-white design with a
+  four-quadrant tooth-number diagram (FDI 1–8 per quadrant, only the teeth worked
+  on), ready for front/back printing on card stock at Actual Size.
 - **Import / Export** — XLSX ledgers (work orders, clinic directory, payments), CSV
   exports, CSV import for clinics and work orders, and a per-clinic work-history Excel
   export.

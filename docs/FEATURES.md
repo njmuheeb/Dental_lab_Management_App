@@ -304,26 +304,36 @@ printing and deletion.
 
 The editor (also opened from a work order's details dialog via **Warranty Card**) edits
 every printed field: lab identity (name/address/phone), patient name/address/phone,
-consultant doctor, work type, material, tooth numbers, shade, delivery/issue date,
-warranty period (**1, 2, 3, 5, 7, 10, 15 or 20 years** — the expiry date is always
-recomputed as delivery + duration), warranty terms & conditions, and care
-recommendations. *Additional notes* are stored on the card but deliberately not
-printed. New cards default to the **Default Warranty Period** from Settings (10 years
-unless changed).
+consultant doctor, work type, material, shade, tooth selection via the interactive
+**dental odontogram** (the human-readable quadrant text is derived automatically),
+delivery/issue date, warranty period (**1, 2, 3, 5, 7, 10, 15 or 20 years** — the
+expiry date is always recomputed as delivery + duration), warranty terms & conditions,
+and care recommendations. *Additional notes* are stored on the card but deliberately
+not printed. New cards default to the **Default Warranty Period** from Settings (10
+years unless changed).
 
 ### Card PDF (front / back)
 
-The export is **exactly two CR80/ID-1 card-sized pages (85.60 × 54 mm)**:
+The export is **exactly two CR80/ID-1 card-sized pages (85.60 × 54 mm)** in a
+professional green-and-white design with rounded card borders:
 
-- **Page 1 — front:** navy brand header (lab name, "Precision | Quality | Care"
-  tagline, tooth glyph, card number), work-type title ("{WORK TYPE} WARRANTY CARD"),
-  blue warranty badge ("N YEARS"), patient panel (name / address / contact) and a
-  details column (tooth numbers, consultant doctor, delivery date, work order number,
-  material / shade). Footer shows generic branding with the lab phone only if
-  configured.
-- **Page 2 — back:** header, centered card title, warranty period strip ("Valid from …
-  to … (N Years)"), numbered **terms & conditions** (editable, auto-shrunk to fit),
-  **care recommendations** (bulleted) and a policy disclaimer footer.
+- **Page 1 — front:** dark-green brand header (lab name, "Precision | Quality | Care"
+  tagline, tooth glyph, "WARRANTY CARD" + card number), an information column (date,
+  case no., patient name, address, contact no., dentist name, type of work), the
+  **four-quadrant tooth-number diagram** on the right, and a green warranty-period
+  strip at the bottom.
+- **Page 2 — back:** matching header, warranty period strip, numbered **terms &
+  conditions** (editable, auto-shrunk to fit), **care recommendations** (bulleted),
+  a contact line (lab phone/address when configured, otherwise a neutral support
+  note) and a policy disclaimer footer.
+
+The tooth diagram draws one vertical and one horizontal line crossing at the exact
+center, creating four quadrant cells in standard patient front-view charting —
+Upper Right (FDI 11–18) top-left, Upper Left (21–28) top-right, Lower Right (41–48)
+bottom-left, Lower Left (31–38) bottom-right. Each cell shows only the teeth that
+were actually worked on, as single digits 1–8 in ascending order (up to four per
+row); quadrants with no selected teeth stay empty. Two-digit FDI numbers are never
+printed inside the diagram.
 
 The PDF can be shared, printed (front/back on card stock — the app shows a
 "Print at Actual Size (100%)" reminder) or saved to Downloads. A preview dialog with

@@ -9,6 +9,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Four-quadrant tooth-number diagram** on the warranty card: a vertical and
+  horizontal cross through the center creates UR/UL/LR/LL cells (patient front view,
+  standard FDI charting), showing only the teeth actually worked on as single digits
+  1-8 in ascending order; empty quadrants stay empty. Warranty cards now store the
+  raw FDI tooth list (`selectedTeeth`, schema v8) and the card editor selects teeth
+  through the interactive dental odontogram (older cards fall back to parsing their
+  stored quadrant text).
 - **Warranty Cards screen** (sidebar entry): searchable, filterable list of all issued
   cards (search by patient, clinic, card or work order number; filters by clinic,
   delivery year and Active/Expired status) with view (front/back preview dialog),
@@ -19,11 +26,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   back) and internal notes fields.
 - Configurable **default warranty period** in Settings → Laboratory Identity, used for
   new cards (per-card override unchanged).
-- Professional card design: brand header with tagline and tooth glyph, work-type
-  driven title ("{WORK TYPE} WARRANTY CARD"), warranty duration badge, patient panel,
-  and a back side with warranty period strip, numbered terms & conditions, care
-  recommendations and a policy disclaimer footer.
 - "Print at Actual Size (100%)" guidance in the warranty card UI and export messages.
+
+### Changed
+
+- Warranty card redesign: green-and-white professional design with a rounded card
+  border, brand header, information fields (date, case no., patient name, address,
+  contact, dentist, type of work), the tooth diagram on the right and a
+  warranty-period strip at the bottom; the back carries the warranty period, terms,
+  care recommendations, contact line and policy disclaimer (previously a blue/navy
+  design with a text tooth list and work-type title).
 
 ### Fixed
 

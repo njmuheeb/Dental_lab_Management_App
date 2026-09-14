@@ -306,12 +306,13 @@ class SyncOutboxTest {
         }
         bootDb.close()
 
-        // Step 3: reopen with Room -> MIGRATION_2_3 .. MIGRATION_6_7 execute and Room validates
+        // Step 3: reopen with Room -> MIGRATION_2_3 .. MIGRATION_7_8 execute and Room validates
         val migrated = Room.databaseBuilder(context, AppDatabase::class.java, dbName)
             .addMigrations(
                 AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3,
                 AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5,
-                AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7
+                AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7,
+                AppDatabase.MIGRATION_7_8
             )
             .allowMainThreadQueries()
             .build()

@@ -8,6 +8,7 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import com.example.data.model.WarrantyCard
+import com.example.data.util.ToothFormat
 import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -17,12 +18,13 @@ import java.util.Locale
  * Patient warranty card PDF: EXACTLY TWO CR80 / ID-1 card-sized pages
  * (85.60 mm x 53.98 mm = 3.375 x 2.125 in = 243 x 153 points at 72 dpi, landscape).
  *
- *  - Page 1 = FRONT — brand header (lab identity + tagline + card number), work-type
- *    title ("{WORK TYPE} WARRANTY CARD"), warranty duration badge, patient panel
- *    (name / address / contact) and clinical details (teeth, consultant doctor,
- *    delivery date, work order number).
- *  - Page 2 = BACK — header, card title, warranty period strip, numbered terms &
- *    conditions, care recommendations and a policy disclaimer footer.
+ *  - Page 1 = FRONT — green rounded-card design: brand header, patient/case details
+ *    (date, case no., patient name, address, contact, dentist, type of work), a
+ *    four-quadrant FDI tooth-number diagram on the right (vertical + horizontal
+ *    cross through the center; single digits 1-8 per quadrant, only the teeth that
+ *    were actually worked on) and a warranty-period strip at the bottom.
+ *  - Page 2 = BACK — matching design with the warranty period, numbered terms &
+ *    conditions, care recommendations, contact line and a policy disclaimer.
  *
  * The page size is set explicitly on every PdfDocument.PageInfo, so the exported
  * PDF is a small card-sized document (never A4/Letter) and prints correctly at
@@ -30,8 +32,8 @@ import java.util.Locale
  *
  * Layout is computed by pure functions ([frontLayout] / [backLayout]) that return
  * positioned shapes; [build] only renders that geometry. This makes the layout
- * unit-testable: page count, page dimensions, in-bounds guarantees, text wrapping
- * and completeness can all be verified without a device.
+ * unit-testable: page count, page dimensions, quadrant placement, in-bounds
+ * guarantees, text wrapping and completeness can all be verified without a device.
  *
  * "Rs."-free zone: no currency here. Base-14 fonts are used, so only ASCII glyphs.
  */
@@ -45,7 +47,6 @@ object WarrantyCardPdfExporter {
     // Generic public branding (user-configurable lab identity is stored on each card)
     const val APP_BRAND = "Dental Lab Management"
     const val TAGLINE = "Precision | Quality | Care"
-    const val KEEP_NOTE = "Keep this card safe for warranty claims"
     const val PRINT_NOTE = "Print at Actual Size (100%) - do not scale to fit the paper."
 
     /** Disclaimer printed on the card back - never a universal legal guarantee. */
@@ -53,30 +54,39 @@ object WarrantyCardPdfExporter {
         "Warranty terms are subject to the laboratory's actual policy and applicable agreements. " +
             "This card is not a substitute for professional dental advice."
 
+    /** Neutral support line shown when the lab has no contact details configured. */
+    private const val NEUTRAL_SUPPORT = "For support, contact your prescribing dental clinic."
+
     // Safe area / margins
     private const val MARGIN = 8f
 
-    // Palette — professional blue / navy / white
-    private val navy = Color.rgb(15, 23, 42)
-    private val blue = Color.rgb(2, 132, 199)
-    private val cyan = Color.rgb(56, 189, 248)
-    private val lightBlue = Color.rgb(224, 242, 254)
-    private val textPrimary = Color.rgb(15, 23, 42)
-    private val textSecondary = Color.rgb(100, 116, 139)
-    private val borderGray = Color.rgb(203, 213, 225)
-    private val watermarkBlue = Color.argb(16, 2, 132, 199) // ~6% alpha
+    // Palette — professional green and white
+    private val greenDark = Color.rgb(20, 83, 45)     // #14532D header / strong text
+    private val green = Color.rgb(22, 163, 74)        // #16A34A accents, cross, strip
+    private val greenLight = Color.rgb(240, 253, 244) // #F0FDF4 panels
+    private val greenBorder = Color.rgb(187, 247, 208)// #BBF7D0 borders
+    private val greenTint = Color.rgb(187, 247, 208)  // light text on dark green
+    private val textPrimary = Color.rgb(17, 24, 39)   // #111827
+    private val textSecondary = Color.rgb(75, 85, 99) // #4B5563
+    private val borderGray = Color.rgb(209, 213, 219) // #D1D5DB dividers
 
     private val dateFmt = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
 
     // ------------------------------------------------------------------ layout model
 
-    /** Filled rectangle (header bands, panels, badge, footer strip); [radius] > 0 = rounded. */
+    /** Filled rectangle (header band, panels, strip); [radius] > 0 = rounded. */
     data class BoxShape(
         val left: Float, val top: Float, val right: Float, val bottom: Float,
         val color: Int, val radius: Float = 0f
     )
 
-    /** Stroked or plain line (dividers, footer rule). */
+    /** Stroked rounded rectangle (card border, diagram frame). */
+    data class OutlineShape(
+        val left: Float, val top: Float, val right: Float, val bottom: Float,
+        val color: Int, val strokeWidth: Float, val radius: Float
+    )
+
+    /** Stroked or plain line (diagram cross, dividers). */
     data class LineShape(val x1: Float, val y1: Float, val x2: Float, val y2: Float, val color: Int, val width: Float)
 
     /** One positioned text run; [y] is the text BASELINE (Android Canvas convention). */
@@ -97,6 +107,7 @@ object WarrantyCardPdfExporter {
         val width: Float,
         val height: Float,
         val boxes: List<BoxShape>,
+        val outlines: List<OutlineShape>,
         val lines: List<LineShape>,
         val texts: List<TextShape>,
         val tooths: List<ToothShape> = emptyList()
@@ -138,6 +149,12 @@ object WarrantyCardPdfExporter {
             } else {
                 canvas.drawRect(RectF(b.left, b.top, b.right, b.bottom), paint)
             }
+        }
+        page.outlines.forEach { o ->
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = o.color; strokeWidth = o.strokeWidth; style = Paint.Style.STROKE
+            }
+            canvas.drawRoundRect(RectF(o.left, o.top, o.right, o.bottom), o.radius, o.radius, paint)
         }
         page.lines.forEach { l ->
             canvas.drawLine(l.x1, l.y1, l.x2, l.y2, Paint().apply {
@@ -303,26 +320,32 @@ object WarrantyCardPdfExporter {
         return minSize to wrapped.take((maxHeight / lineH).toInt().coerceAtLeast(1))
     }
 
-    /** Upper-cased work-type title; falls back to "DENTAL" when no work type is set. */
-    fun workTitle(workType: String): String {
-        val t = workType.trim()
-        return if (t.isBlank()) "DENTAL" else t.uppercase(Locale.getDefault())
-    }
-
     private fun measure(text: String, size: Float, bold: Boolean): Float =
         paint(Color.BLACK, size, bold).measureText(text)
+
+    /**
+     * The FDI tooth list driving the quadrant diagram. Newer cards store the raw FDI
+     * list directly; cards saved before that column existed fall back to parsing the
+     * human-readable quadrant text.
+     */
+    fun effectiveTeeth(card: WarrantyCard): String =
+        card.selectedTeeth.ifBlank { ToothFormat.fdiFromQuadrantText(card.toothNumbers) }
 
     // ------------------------------------------------------------------ FRONT
     //
     // Vertical plan (values are text baselines, card height = 153):
-    //   0-26    navy header: tooth icon + lab name (11) + tagline (19.5) + card no (11)
-    //   26-28.5 blue accent strip
-    //   33.5-51.5 work-type title (41) + "WARRANTY CARD" (49.5); blue badge on the right
-    //   54-100  patient panel (light blue): label 61, name 69/78, address 86/91.5, phone 98
-    //   61-114.5 right column: teeth (2-line capable), consultant, delivery, work order no
-    //   137-153 footer strip: generic brand (+phone if configured) + keep-safe note
+    //   2-151   rounded green card border (stroke)
+    //   4-26    dark-green header band: tooth glyph + lab name + tagline,
+    //           "WARRANTY CARD" + card number on the right
+    //   37-124  LEFT column (x 10..132): Date + Case No., Patient Name (2 lines),
+    //           Address (2 lines), Contact + Dentist, Type of Work (2 lines)
+    //   37-117  RIGHT quadrant diagram (x 140..231): section label, rounded panel
+    //           with a vertical + horizontal cross through the exact center, four
+    //           quadrant cells (UR | UL / LR | LL) holding single digits 1-8
+    //   128-149 green warranty-period strip (bottom)
     fun frontLayout(card: WarrantyCard): CardPage {
         val boxes = mutableListOf<BoxShape>()
+        val outlines = mutableListOf<OutlineShape>()
         val lines = mutableListOf<LineShape>()
         val texts = mutableListOf<TextShape>()
         val tooths = mutableListOf<ToothShape>()
@@ -338,96 +361,109 @@ object WarrantyCardPdfExporter {
             add(text, left + (right - left - tw) / 2f, baseline, size, color, bold)
         }
 
-        // --- Subtle tooth watermark behind the details (drawn first, ~6% alpha)
-        tooths += ToothShape(121.5f, 88f, 66f, 70f, watermarkBlue)
+        /** Label + wrapped value field used by the left information column. */
+        fun field(label: String, value: String, x: Float, labelY: Float, width: Float, valueSize: Float, maxLines: Int) {
+            add(label, x, labelY, 3.8f, textSecondary, bold = true)
+            var vy = labelY + 6.5f
+            wrap(value.ifBlank { "-" }, width, valueSize, bold = true, maxLines = maxLines).forEach { line ->
+                add(line, x, vy, valueSize, textPrimary, bold = true)
+                vy += valueSize + 1.6f
+            }
+        }
 
-        // --- Brand header band
-        boxes += BoxShape(0f, 0f, w, 26f, navy)
-        boxes += BoxShape(0f, 26f, w, 28.5f, blue)
-        tooths += ToothShape(15f, 13f, 10f, 12f, Color.WHITE)
-        val numText = card.cardNumber
-        val numW = measure(numText, 4.5f, bold = true)
-        add(numText, w - MARGIN - numW, 11f, 4.5f, Color.WHITE, bold = true)
-        val labAvail = (w - MARGIN - numW - 6f - 23f).coerceAtLeast(60f)
+        // --- Rounded card border + header band
+        outlines += OutlineShape(2f, 2f, w - 2f, h - 2f, green, strokeWidth = 1.6f, radius = 10f)
+        boxes += BoxShape(4f, 4f, w - 4f, 26f, greenDark, radius = 7f)
+        tooths += ToothShape(13f, 15f, 8f, 9.5f, Color.WHITE)
+        val labAvail = (w - 8f - 60f - 22f).coerceAtLeast(60f)
         add(
             ellipsize(card.labName.ifBlank { APP_BRAND }, labAvail, 6.8f, bold = true),
-            23f, 11f, 6.8f, Color.WHITE, bold = true
+            22f, 13.5f, 6.8f, Color.WHITE, bold = true
         )
-        add(TAGLINE, 23f, 19.5f, 3.8f, cyan)
+        add(TAGLINE, 22f, 20.5f, 3.4f, greenTint)
+        val cardTitle = "WARRANTY CARD"
+        val ctW = measure(cardTitle, 4.2f, bold = true)
+        add(cardTitle, w - 8f - ctW, 12.5f, 4.2f, Color.WHITE, bold = true)
+        val numW = measure(card.cardNumber, 3.6f, bold = false)
+        add(card.cardNumber, w - 8f - numW, 20f, 3.6f, greenTint)
 
-        // --- Work-type title + warranty badge
-        add(ellipsize(workTitle(card.workType), 169f, 6.3f, bold = true), MARGIN, 41f, 6.3f, navy, bold = true)
-        add("WARRANTY CARD", MARGIN, 49.5f, 6.3f, blue, bold = true)
+        // --- LEFT information column
+        val workMaterial = listOf(card.workType, card.material).filter { it.isNotBlank() }.joinToString(" - ")
+        field("DATE", dateFmt.format(Date(card.deliveryDate)), 10f, 37f, 58f, 5.2f, 1)
+        field("CASE NO.", card.workOrderNumber, 74f, 37f, 58f, 5.2f, 1)
+        field("PATIENT NAME", card.patientName, 10f, 51f, 122f, 6.2f, 2)
+        field("ADDRESS", card.patientAddress, 10f, 74f, 122f, 4.2f, 2)
+        field("CONTACT NO.", card.patientPhone, 10f, 94.5f, 58f, 5.2f, 1)
+        field("DENTIST NAME", card.consultantDoctor, 74f, 94.5f, 58f, 5.2f, 1)
+        field("TYPE OF WORK", workMaterial, 10f, 109.5f, 122f, 5.2f, 2)
 
-        val badgeLeft = w - MARGIN - 56f
-        boxes += BoxShape(badgeLeft, 33.5f, w - MARGIN, 51.5f, blue, radius = 4f)
-        val yearsLabel = "${card.warrantyYears} YEAR${if (card.warrantyYears == 1) "" else "S"}"
-        addCentered(yearsLabel, badgeLeft, w - MARGIN, 43f, 6.8f, Color.WHITE, bold = true)
-        addCentered("WARRANTY", badgeLeft, w - MARGIN, 49f, 3.6f, Color.WHITE)
+        // --- RIGHT four-quadrant tooth-number diagram
+        addCentered("TOOTH NUMBER(S)", 138f, 233f, 37f, 4.3f, greenDark, bold = true)
+        val dgLeft = 140f
+        val dgTop = 41f
+        val dgRight = 231f
+        val dgBottom = 117f
+        val dgCx = (dgLeft + dgRight) / 2f   // 185.5
+        val dgCy = (dgTop + dgBottom) / 2f   // 79
+        boxes += BoxShape(dgLeft, dgTop, dgRight, dgBottom, greenLight, radius = 6f)
+        outlines += OutlineShape(dgLeft, dgTop, dgRight, dgBottom, greenBorder, strokeWidth = 0.8f, radius = 6f)
+        lines += LineShape(dgCx, dgTop, dgCx, dgBottom, green, 1.0f)      // vertical cross
+        lines += LineShape(dgLeft, dgCy, dgRight, dgCy, green, 1.0f)      // horizontal cross
 
-        // --- Patient panel (light blue, rounded)
-        boxes += BoxShape(6f, 54f, 128f, 100f, lightBlue, radius = 5f)
-        add("PATIENT", 11f, 61f, 4.2f, textSecondary, bold = true)
-        var py = 69f
-        wrap(card.patientName.ifBlank { "-" }, 115f, 7.3f, bold = true, maxLines = 2).forEach { line ->
-            add(line, 11f, py, 7.3f, navy, bold = true)
-            py += 9f
-        }
-        if (card.patientAddress.isNotBlank()) {
-            wrap(card.patientAddress, 115f, 4.3f, bold = false, maxLines = 2).forEach { line ->
-                add(line, 11f, py, 4.3f, textSecondary)
-                py += 5.5f
+        val quadrants = ToothFormat.quadrantDigits(effectiveTeeth(card))
+        val cellW = (dgRight - dgLeft) / 2f  // 45.5
+        val cellH = (dgBottom - dgTop) / 2f  // 38
+
+        /**
+         * One quadrant cell: tiny label (UR/UL/LR/LL) at the top, then the selected
+         * single digits 1-8 in ascending order, up to 4 per row, centered. Empty
+         * quadrants stay blank. Layout (patient front view, standard charting):
+         *   top row:    UR (left) | UL (right)
+         *   bottom row: LR (left) | LL (right)
+         */
+        fun quadrantCell(label: String, digits: List<Int>, cellLeft: Float, cellTop: Float) {
+            addCentered(label, cellLeft, cellLeft + cellW, cellTop + 7f, 3f, textSecondary, bold = true)
+            digits.chunked(4).forEachIndexed { rowIndex, row ->
+                val baseline = cellTop + 21f + rowIndex * 11f
+                val k = row.size
+                row.forEachIndexed { i, digit ->
+                    val ds = digit.toString()
+                    val dw = measure(ds, 7.5f, bold = true)
+                    val x = cellLeft + cellW / 2f + (i - (k - 1) / 2f) * 11f - dw / 2f
+                    add(ds, x, baseline, 7.5f, greenDark, bold = true)
+                }
             }
         }
-        if (card.patientPhone.isNotBlank()) {
-            add(ellipsize(card.patientPhone, 115f, 4.6f, bold = false), 11f, 98f, 4.6f, textSecondary)
-        }
 
-        // --- Clinical details column (right)
-        val colX = 136f
-        fun field(label: String, value: String, labelY: Float, wrapTwoLines: Boolean) {
-            add(label, colX, labelY, 4.2f, textSecondary, bold = true)
-            var vy = labelY + 6.5f
-            val maxLines = if (wrapTwoLines) 2 else 1
-            wrap(value.ifBlank { "-" }, 99f, 5.6f, bold = true, maxLines = maxLines).forEach { line ->
-                add(line, colX, vy, 5.6f, navy, bold = true)
-                vy += 6.7f
-            }
-        }
-        field("TOOTH NUMBER(S)", card.toothNumbers, 61f, wrapTwoLines = true)
-        field("CONSULTANT DR.", card.consultantDoctor, 82f, wrapTwoLines = false)
-        field("DATE OF DELIVERY", dateFmt.format(Date(card.deliveryDate)), 96f, wrapTwoLines = false)
-        field("WORK ORDER NO.", card.workOrderNumber, 108f, wrapTwoLines = false)
-        field(
-            "MATERIAL / SHADE",
-            listOf(card.material, card.shade).filter { it.isNotBlank() }.joinToString("  •  "),
-            120f, wrapTwoLines = false
+        quadrantCell("UR", quadrants.upperRight, dgLeft, dgTop)
+        quadrantCell("UL", quadrants.upperLeft, dgCx, dgTop)
+        quadrantCell("LR", quadrants.lowerRight, dgLeft, dgCy)
+        quadrantCell("LL", quadrants.lowerLeft, dgCx, dgCy)
+
+        // --- BOTTOM warranty-period strip
+        boxes += BoxShape(4f, 128f, w - 4f, 149f, green, radius = 7f)
+        val yearsWord = if (card.warrantyYears == 1) "YEAR" else "YEARS"
+        addCentered("WARRANTY PERIOD: ${card.warrantyYears} $yearsWord", 4f, w - 4f, 139f, 6.2f, Color.WHITE, bold = true)
+        addCentered(
+            "Valid from ${dateFmt.format(Date(card.deliveryDate))} to ${dateFmt.format(Date(card.warrantyExpiryDate))}",
+            4f, w - 4f, 145f, 3.8f, Color.WHITE
         )
 
-        // --- Footer strip (generic branding + contact only if configured)
-        boxes += BoxShape(0f, 137f, w, h, lightBlue)
-        lines += LineShape(0f, 137f, w, 137f, blue, 0.8f)
-        val footerLeft =
-            if (card.labPhone.isNotBlank()) "$APP_BRAND  |  ${card.labPhone}" else APP_BRAND
-        add(ellipsize(footerLeft, 130f, 4.5f, bold = true), MARGIN, 147.5f, 4.5f, navy, bold = true)
-        val keepW = measure(KEEP_NOTE, 4f, bold = false)
-        add(KEEP_NOTE, w - MARGIN - keepW, 147.5f, 4f, textSecondary)
-
-        return CardPage(w, h, boxes, lines, texts, tooths)
+        return CardPage(w, h, boxes, outlines, lines, texts, tooths)
     }
 
     // ------------------------------------------------------------------ BACK
     //
     // Vertical plan (values are text baselines, card height = 153):
-    //   0-16     navy header: tooth icon + "DENTAL LAB MANAGEMENT" + card number
-    //   24.5     centered "{WORK TYPE} WARRANTY CARD" title
-    //   28-43    warranty period strip (light blue, rounded)
-    //   51       "TERMS & CONDITIONS" heading; body auto-fits 54.5-103
-    //   105.5    divider
-    //   111      "CARE RECOMMENDATIONS" heading; bullets auto-fit 114.5-132.5
-    //   134.5    divider; disclaimer footer 139.5 / 143.7
+    //   2-151   rounded green card border (stroke)
+    //   4-26    dark-green header band (same as front)
+    //   30-44   warranty period strip (light green, rounded)
+    //   53      centered "WARRANTY TERMS & CONDITIONS" heading; body auto-fits 56-98
+    //   100.5   divider; 106.5 "CARE RECOMMENDATIONS"; bullets auto-fit 109.5-125.5
+    //   127.5   divider; 132.5 contact line; 137.5/141.3 disclaimer footer
     fun backLayout(card: WarrantyCard): CardPage {
         val boxes = mutableListOf<BoxShape>()
+        val outlines = mutableListOf<OutlineShape>()
         val lines = mutableListOf<LineShape>()
         val texts = mutableListOf<TextShape>()
         val tooths = mutableListOf<ToothShape>()
@@ -443,56 +479,68 @@ object WarrantyCardPdfExporter {
             add(text, left + (right - left - tw) / 2f, baseline, size, color, bold)
         }
 
-        // --- Header
-        boxes += BoxShape(0f, 0f, w, 16f, navy)
-        tooths += ToothShape(13f, 8f, 8f, 9.5f, Color.WHITE)
-        add(APP_BRAND.uppercase(Locale.getDefault()), 20f, 10.5f, 5f, Color.WHITE, bold = true)
+        // --- Card border + header band (matches the front)
+        outlines += OutlineShape(2f, 2f, w - 2f, h - 2f, green, strokeWidth = 1.6f, radius = 10f)
+        boxes += BoxShape(4f, 4f, w - 4f, 26f, greenDark, radius = 7f)
+        tooths += ToothShape(13f, 15f, 8f, 9.5f, Color.WHITE)
+        val labAvail = (w - 8f - 60f - 22f).coerceAtLeast(60f)
+        add(
+            ellipsize(card.labName.ifBlank { APP_BRAND }, labAvail, 6.8f, bold = true),
+            22f, 13.5f, 6.8f, Color.WHITE, bold = true
+        )
+        add(TAGLINE, 22f, 20.5f, 3.4f, greenTint)
         val numW = measure(card.cardNumber, 4f, bold = false)
-        add(card.cardNumber, w - MARGIN - numW, 10.5f, 4f, Color.WHITE)
-
-        // --- Centered card title
-        val title = ellipsize("${workTitle(card.workType)} WARRANTY CARD", 227f, 5.5f, bold = true)
-        addCentered(title, MARGIN, w - MARGIN, 24.5f, 5.5f, navy, bold = true)
+        add(card.cardNumber, w - 8f - numW, 15f, 4f, Color.WHITE)
 
         // --- Warranty period strip
-        boxes += BoxShape(6f, 28f, w - 6f, 43f, lightBlue, radius = 4f)
-        add("WARRANTY PERIOD", 10f, 34.5f, 3.8f, textSecondary, bold = true)
-        val yearsWord = if (card.warrantyYears == 1) "Year" else "Years"
-        val periodValue = "Valid from ${dateFmt.format(Date(card.deliveryDate))} to " +
-            "${dateFmt.format(Date(card.warrantyExpiryDate))} (${card.warrantyYears} $yearsWord)"
-        add(ellipsize(periodValue, 223f, 4.6f, bold = true), 10f, 40.8f, 4.6f, navy, bold = true)
+        boxes += BoxShape(10f, 30f, w - 10f, 44f, greenLight, radius = 5f)
+        val yearsWord = if (card.warrantyYears == 1) "YEAR" else "YEARS"
+        addCentered("WARRANTY PERIOD: ${card.warrantyYears} $yearsWord", 10f, w - 10f, 36.5f, 4.6f, greenDark, bold = true)
+        addCentered(
+            "Valid from ${dateFmt.format(Date(card.deliveryDate))} to ${dateFmt.format(Date(card.warrantyExpiryDate))}",
+            10f, w - 10f, 41.5f, 3.8f, greenDark
+        )
 
         // --- Terms & conditions (numbered, auto-fitted)
-        add("TERMS & CONDITIONS", MARGIN, 51f, 4.2f, navy, bold = true)
+        addCentered("WARRANTY TERMS & CONDITIONS", 10f, w - 10f, 53f, 4.5f, greenDark, bold = true)
         val termsLines = card.terms.split('\n').map { it.trim() }.filter { it.isNotEmpty() }
-        val (termsSize, termsWrapped) = fitBlock(termsLines, 227f, 48.5f)
-        var ty = 54.5f + termsSize
+        val (termsSize, termsWrapped) = fitBlock(termsLines, 223f, 42f)
+        var ty = 56f + termsSize
         termsWrapped.forEach { line ->
-            add(line, MARGIN, ty, termsSize, textPrimary)
+            add(line, 10f, ty, termsSize, textPrimary)
             ty += termsSize + 1.6f
         }
 
         // --- Care recommendations (bulleted, auto-fitted)
-        lines += LineShape(MARGIN, 105.5f, w - MARGIN, 105.5f, borderGray, 0.5f)
-        add("CARE RECOMMENDATIONS", MARGIN, 111f, 4.2f, navy, bold = true)
+        lines += LineShape(10f, 100.5f, w - 10f, 100.5f, borderGray, 0.5f)
+        addCentered("CARE RECOMMENDATIONS", 10f, w - 10f, 106.5f, 4.5f, greenDark, bold = true)
         val careLines = card.careInstructions.split('\n')
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .map { if (it.startsWith("•") || it.startsWith("-")) it else "• $it" }
-        val (careSize, careWrapped) = fitBlock(careLines, 227f, 18f, maxSize = 4.3f)
-        var cy = 114.5f + careSize
+        val (careSize, careWrapped) = fitBlock(careLines, 223f, 16f, maxSize = 4.0f)
+        var cy = 109.5f + careSize
         careWrapped.forEach { line ->
-            add(line, MARGIN, cy, careSize, textPrimary)
+            add(line, 10f, cy, careSize, textPrimary)
             cy += careSize + 1.4f
         }
 
+        // --- Contact / support line (configurable, neutral placeholder otherwise)
+        lines += LineShape(10f, 127.5f, w - 10f, 127.5f, borderGray, 0.5f)
+        val contact =
+            when {
+                card.labPhone.isNotBlank() -> "Contact: ${card.labPhone}"
+                card.labAddress.isNotBlank() -> ellipsize(card.labAddress, 200f, 3.6f, bold = false)
+                else -> NEUTRAL_SUPPORT
+            }
+        addCentered(contact, 10f, w - 10f, 132.5f, 3.6f, greenDark, bold = true)
+
         // --- Disclaimer footer
-        lines += LineShape(MARGIN, 134.5f, w - MARGIN, 134.5f, borderGray, 0.5f)
-        wrap(DISCLAIMER, 227f, 3.2f, bold = false, maxLines = 2)
+        wrap(DISCLAIMER, 223f, 3.0f, bold = false, maxLines = 2)
             .forEachIndexed { i, line ->
-                add(line, MARGIN, 139.5f + i * 4.2f, 3.2f, textSecondary)
+                addCentered(line, 10f, w - 10f, 137.5f + i * 3.8f, 3.0f, textSecondary)
             }
 
-        return CardPage(w, h, boxes, lines, texts, tooths)
+        return CardPage(w, h, boxes, outlines, lines, texts, tooths)
     }
 }

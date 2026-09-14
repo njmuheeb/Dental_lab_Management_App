@@ -166,9 +166,10 @@ Warranty cards live in their own screen: open the side drawer → **Warranty Car
    - **Manual Entry** — optionally pick a clinic and a patient so the card is linked
      to your records, then fill the rest by hand in the editor.
 3. In the editor, check or adjust: patient name/address/phone, consultant doctor, work
-   type, material, tooth numbers, shade, delivery date, warranty period (1–20 years —
-   the expiry date is recalculated automatically), the printed terms and the care
-   recommendations. *Additional notes* stay on record but are never printed.
+   type, material, shade, tooth selection (tap the teeth on the **dental odontogram**
+   — the card prints them in a four-quadrant diagram), delivery date, warranty period
+   (1–20 years — the expiry date is recalculated automatically), the printed terms and
+   the care recommendations. *Additional notes* stay on record but are never printed.
 4. Tap **Save Card**.
 
 **Preview, print and export:**

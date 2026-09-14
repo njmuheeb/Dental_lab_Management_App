@@ -66,4 +66,73 @@ object ToothFormat {
     /** Display value for table cells: compact quadrant format or "—" when not specified. */
     fun displayOrDash(selectedTeeth: String): String =
         formatCompact(selectedTeeth).ifBlank { "—" }
+
+    /**
+     * Teeth grouped per quadrant as single digits (1-8), for the four-quadrant diagram
+     * on the warranty card. FDI quadrant mapping (standard charting, patient front view):
+     *
+     *   Upper Right (UR) = FDI 1x -> drawn top-LEFT,   Upper Left (UL) = 2x -> top-RIGHT
+     *   Lower Right (LR) = FDI 4x -> drawn bottom-LEFT, Lower Left (LL) = 3x -> bottom-RIGHT
+     *
+     * Each list is distinct and sorted ascending; invalid tokens are ignored.
+     */
+    data class ToothQuadrants(
+        val upperRight: List<Int>,
+        val upperLeft: List<Int>,
+        val lowerLeft: List<Int>,
+        val lowerRight: List<Int>
+    )
+
+    fun quadrantDigits(selectedTeeth: String): ToothQuadrants {
+        val ur = mutableListOf<Int>()
+        val ul = mutableListOf<Int>()
+        val ll = mutableListOf<Int>()
+        val lr = mutableListOf<Int>()
+        parse(selectedTeeth).forEach { fdi ->
+            val digit = digitOf(fdi)
+            if (digit in 1..8) when (quadrantOf(fdi)) {
+                1 -> ur.add(digit)
+                2 -> ul.add(digit)
+                3 -> ll.add(digit)
+                4 -> lr.add(digit)
+            }
+        }
+        return ToothQuadrants(
+            upperRight = ur.distinct().sorted(),
+            upperLeft = ul.distinct().sorted(),
+            lowerLeft = ll.distinct().sorted(),
+            lowerRight = lr.distinct().sorted()
+        )
+    }
+
+    /**
+     * Best-effort reverse of [formatLong] / [formatCompact]: turns a human-edited
+     * quadrant text ("Upper Right: 1, 2 | Lower Left: 6") back into an FDI string
+     * ("11,12,36"). Used as a fallback for warranty cards stored before the raw
+     * FDI list was kept on the card.
+     */
+    fun fdiFromQuadrantText(text: String): String {
+        val fdi = mutableListOf<Int>()
+        text.split("|").forEach { part ->
+            val cleaned = part.trim()
+            if (cleaned.isEmpty()) return@forEach
+            val quadrant = when {
+                cleaned.startsWith("Upper Right", ignoreCase = true) ||
+                    cleaned.startsWith("UR:", ignoreCase = true) -> 1
+                cleaned.startsWith("Upper Left", ignoreCase = true) ||
+                    cleaned.startsWith("UL:", ignoreCase = true) -> 2
+                cleaned.startsWith("Lower Left", ignoreCase = true) ||
+                    cleaned.startsWith("LL:", ignoreCase = true) -> 3
+                cleaned.startsWith("Lower Right", ignoreCase = true) ||
+                    cleaned.startsWith("LR:", ignoreCase = true) -> 4
+                else -> return@forEach
+            }
+            val digits = cleaned.substringAfter(":", "").ifBlank { return@forEach }
+            digits.split(",").forEach { tok ->
+                val d = tok.trim().toIntOrNull()
+                if (d != null && d in 1..8) fdi.add(quadrant * 10 + d)
+            }
+        }
+        return fdi.distinct().sorted().joinToString(",")
+    }
 }

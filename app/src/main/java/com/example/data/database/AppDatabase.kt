@@ -40,7 +40,7 @@ import kotlinx.coroutines.launch
         SyncQueueEntry::class,
         WarrantyCard::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -359,6 +359,18 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v7 -> v8: warranty cards keep the raw FDI tooth list (`selectedTeeth`) that
+         * drives the four-quadrant diagram on the printed card. Additive only; older
+         * rows fall back to parsing their human-readable `toothNumbers` text at render
+         * time, so no SQL backfill is needed.
+         */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `warranty_cards` ADD COLUMN `selectedTeeth` TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         // Privacy: the database file no longer carries the old lab branding in its name.
         private const val DB_NAME = "dental_lab_management.db"
         private const val LEGACY_DB_NAME = "nazneen_dental_lab.db"
@@ -385,7 +397,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DB_NAME
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                 .addCallback(DatabaseCallback(scope))
                 .build()
                 INSTANCE = instance

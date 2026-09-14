@@ -15,7 +15,7 @@ relate to each other, and how migrations work.
 | Database engine | SQLite (via Android) |
 | Access layer | Room 2.7.0 (`androidx.room`) with KSP code generation |
 | Database file | `dental_lab_management.db` (app-private internal storage) |
-| Schema version | **7** |
+| Schema version | **8** |
 | Threading | DAOs are suspend functions / `Flow`, called off the main thread through the repository |
 | Architecture | Single `AppDatabase`, one DAO per entity, unified access via `DentalLabRepository` |
 
@@ -141,7 +141,9 @@ This is the core billing model of the app — combined monthly payments are neve
 | `clinicId`, `clinicName` | INTEGER / TEXT | **FK → clinics.id** + name snapshot (0/'' when a manual card has no link) |
 | `patientId`, `patientName` | INTEGER / TEXT | **FK → patients.id** + name snapshot |
 | `patientAddress`, `patientPhone` | TEXT | printed on the card |
-| `workType`, `material`, `shade`, `toothNumbers` | TEXT | work details (teeth in quadrant notation) |
+| `workType`, `material`, `shade` | TEXT | work details |
+| `selectedTeeth` | TEXT | raw FDI list e.g. `12,13,21,47` — drives the four-quadrant diagram on the printed card |
+| `toothNumbers` | TEXT | quadrant notation e.g. `UR: 1, 2 \| LL: 6` (legacy rows without `selectedTeeth` are parsed back from this at render time) |
 | `consultantDoctor` | TEXT | e.g. `Dr. Sameer Khan` |
 | `deliveryDate` | INTEGER | issue date of the card |
 | `warrantyYears` | INTEGER | duration (1–20) |
@@ -235,6 +237,7 @@ never falls back to destructive migration, so user data is preserved across upgr
 | 4 → 5 | `warranty_cards.workOrderId` becomes nullable (standalone cards allowed; table rebuild) |
 | 5 → 6 | `warranty_cards.clinicName` snapshot column added and backfilled from `clinics`; stored rows carrying the retired default lab branding are replaced with the generic name |
 | 6 → 7 | `warranty_cards` gains `workOrderNumber` (backfilled from work orders), `careInstructions` (backfilled with the default care recommendations) and `notes`; `lab_settings` gains `defaultWarrantyYears` |
+| 7 → 8 | `warranty_cards` gains `selectedTeeth` (raw FDI list for the quadrant diagram); older rows fall back to parsing `toothNumbers` at render time, so no SQL backfill is needed |
 
 The database file was renamed from a previous internal name to
 `dental_lab_management.db`; on first launch after the rename the app copies the old file

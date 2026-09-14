@@ -4,6 +4,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import com.example.data.model.WarrantyCard
 import com.example.data.repository.DentalLabRepository
+import com.example.data.util.ToothFormat
 import com.example.export.WarrantyCardPdfExporter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -25,10 +26,12 @@ import java.util.Locale
  *
  *  - EXACTLY two pages: page 1 = front, page 2 = back
  *  - pages are CR80/ID-1 card size (85.60 x 53.98 mm = 243 x 153 pt), never A4/Letter
- *  - every text run, box, line and tooth glyph is fully inside its page
- *    (no clipping, no missing text, no overflow beyond the card boundary)
- *  - all required front-side fields are rendered (patient, teeth, consultant,
- *    delivery date, work order number, warranty badge, branding)
+ *  - the four-quadrant tooth diagram: vertical + horizontal cross through the exact
+ *    center, FDI teeth shown as single digits 1-8 in the CORRECT quadrant (patient
+ *    front view: UR top-left, UL top-right, LR bottom-left, LL bottom-right), empty
+ *    quadrants stay empty
+ *  - every text run, box, outline, line and tooth glyph is fully inside its page
+ *  - all required front-side fields are rendered
  *  - the back side shows the COMPLETE terms, care recommendations, warranty period
  *    and the policy disclaimer (no dropped lines)
  *  - long names/addresses/words wrap safely instead of being cut off
@@ -44,7 +47,8 @@ class WarrantyCardPdfLayoutTest {
         patientName: String = "Amina Shaikh",
         patientAddress: String = "12 Hill Road, Bandra West, Mumbai",
         patientPhone: String = "+91 91111 11111",
-        toothNumbers: String = "Upper Right: 1, 2 | Lower Left: 6, 7",
+        selectedTeeth: String = "12,13,14,21,47",
+        toothNumbers: String = ToothFormat.formatLong(selectedTeeth),
         consultantDoctor: String = "Dr. Sameer Khan",
         workType: String = "Zirconia Crown (Monolithic)",
         material: String = "Multilayer Zirconia",
@@ -72,6 +76,7 @@ class WarrantyCardPdfLayoutTest {
         workType = workType,
         material = material,
         shade = shade,
+        selectedTeeth = selectedTeeth,
         toothNumbers = toothNumbers,
         consultantDoctor = consultantDoctor,
         deliveryDate = 1_760_000_000_000L,
@@ -123,17 +128,17 @@ class WarrantyCardPdfLayoutTest {
             assertTrue("$pageName box outside page: $b", b.left >= -0.01f && b.right <= page.width + 0.01f)
             assertTrue("$pageName box outside page: $b", b.top >= -0.01f && b.bottom <= page.height + 0.01f)
         }
+        page.outlines.forEach { o ->
+            assertTrue("$pageName outline outside page: $o", o.left >= -0.01f && o.right <= page.width + 0.01f)
+            assertTrue("$pageName outline outside page: $o", o.top >= -0.01f && o.bottom <= page.height + 0.01f)
+        }
         page.lines.forEach { l ->
             assertTrue("$pageName line outside page: $l", l.x1 >= -0.01f && l.x2 <= page.width + 0.01f)
             assertTrue("$pageName line outside page: $l", l.y1 >= -0.01f && l.y2 <= page.height + 0.01f)
         }
         page.tooths.forEach { t ->
-            val left = t.cx - t.width / 2f
-            val right = t.cx + t.width / 2f
-            val top = t.cy - t.height / 2f
-            val bottom = t.cy + t.height / 2f
-            assertTrue("$pageName tooth outside page: $t", left >= -0.01f && right <= page.width + 0.01f)
-            assertTrue("$pageName tooth outside page: $t", top >= -0.01f && bottom <= page.height + 0.01f)
+            assertTrue("$pageName tooth outside page: $t", t.cx - t.width / 2f >= -0.01f && t.cx + t.width / 2f <= page.width + 0.01f)
+            assertTrue("$pageName tooth outside page: $t", t.cy - t.height / 2f >= -0.01f && t.cy + t.height / 2f <= page.height + 0.01f)
         }
     }
 
@@ -143,6 +148,15 @@ class WarrantyCardPdfLayoutTest {
     private fun backText(c: WarrantyCard) = WarrantyCardPdfExporter.backLayout(c)
         .texts.joinToString(" ") { it.text }
 
+    /** Digit texts (7.5pt bold) located inside a rectangle of the tooth diagram. */
+    private fun digitsIn(
+        page: WarrantyCardPdfExporter.CardPage,
+        left: Float, top: Float, right: Float, bottom: Float
+    ): List<String> =
+        page.texts
+            .filter { it.size == 7.5f && it.bold && it.x >= left && it.x < right && it.y >= top && it.y < bottom }
+            .map { it.text }
+
     // ------------------------------------------------------------ pages
 
     @Test
@@ -150,9 +164,10 @@ class WarrantyCardPdfLayoutTest {
         val pages = WarrantyCardPdfExporter.pageLayouts(card())
         assertEquals(2, pages.size)
         assertEquals(WarrantyCardPdfExporter.PAGE_COUNT, pages.size)
-        // Front carries the work-type card title; back carries the terms section
-        assertTrue(pages[0].texts.any { it.text == "WARRANTY CARD" })
-        assertTrue(pages[1].texts.any { it.text == "TERMS & CONDITIONS" })
+        // Front carries the tooth diagram + warranty strip; back carries the terms
+        assertTrue(pages[0].texts.any { it.text == "TOOTH NUMBER(S)" })
+        assertTrue(pages[0].texts.any { it.text == "WARRANTY PERIOD: 10 YEARS" })
+        assertTrue(pages[1].texts.any { it.text == "WARRANTY TERMS & CONDITIONS" })
     }
 
     @Test
@@ -168,6 +183,74 @@ class WarrantyCardPdfLayoutTest {
         // Explicitly NOT a document-size page
         assertFalse(WarrantyCardPdfExporter.CARD_WIDTH_PT == 595f) // A4 width
         assertFalse(WarrantyCardPdfExporter.CARD_HEIGHT_PT == 842f) // A4 height
+    }
+
+    // ------------------------------------------------------------ four-quadrant tooth diagram
+
+    @Test
+    fun `diagram maps FDI teeth to the correct quadrants - reference case`() {
+        // Selected: 12,13,14 (Upper Right), 21 (Upper Left), 47 (Lower Right)
+        val front = WarrantyCardPdfExporter.frontLayout(card())
+
+        // All four quadrant labels are drawn
+        listOf("UR", "UL", "LR", "LL").forEach { q ->
+            assertTrue("missing quadrant label $q", front.texts.any { it.text == q && it.size == 3f })
+        }
+
+        // Diagram box: x 140..231, y 41..117 -> cells UR(140..185.5, 41..79),
+        // UL(185.5..231, 41..79), LR(140..185.5, 79..117), LL(185.5..231, 79..117)
+        assertEquals(listOf("2", "3", "4"), digitsIn(front, 139f, 40f, 186f, 79f)) // UR
+        assertEquals(listOf("1"), digitsIn(front, 186f, 40f, 232f, 79f))           // UL
+        assertEquals(listOf("7"), digitsIn(front, 139f, 79f, 186f, 117f))          // LR
+        assertTrue("lower-left quadrant must stay empty", digitsIn(front, 186f, 79f, 232f, 117f).isEmpty()) // LL
+
+        // The cross: one vertical line at the exact horizontal center of the diagram,
+        // one horizontal line at the exact vertical center (they intersect at the center)
+        val vertical = front.lines.first { it.x1 == it.x2 && kotlin.math.abs(it.x1 - 185.5f) < 0.01f }
+        val horizontal = front.lines.first { it.y1 == it.y2 && kotlin.math.abs(it.y1 - 79f) < 0.01f }
+        assertTrue(vertical.y1 < horizontal.y1 && vertical.y2 > horizontal.y1) // vertical spans the horizontal line
+        assertTrue(horizontal.x1 < vertical.x1 && horizontal.x2 > vertical.x1) // horizontal spans the vertical line
+    }
+
+    @Test
+    fun `a full quadrant wraps eight digits into two rows inside its cell`() {
+        val front = WarrantyCardPdfExporter.frontLayout(card(selectedTeeth = (11..18).joinToString(",")))
+        assertEquals(
+            listOf("1", "2", "3", "4", "5", "6", "7", "8"),
+            digitsIn(front, 139f, 40f, 186f, 79f)
+        )
+        // Exactly two rows (baselines 62 and 73), both inside the UR cell
+        val rows = front.texts
+            .filter { it.size == 7.5f && it.bold && it.x < 186f && it.y > 41f && it.y < 79f }
+            .map { it.y }
+            .distinct()
+            .sorted()
+        assertEquals(listOf(62f, 73f), rows)
+        assertAllShapesInsidePage(front, "Front")
+    }
+
+    @Test
+    fun `legacy cards without stored FDI fall back to the quadrant text`() {
+        val c = card(
+            selectedTeeth = "",
+            toothNumbers = "Upper Right: 2, 3, 4 | Upper Left: 1 | Lower Right: 7"
+        )
+        assertEquals("12,13,14,21,47", WarrantyCardPdfExporter.effectiveTeeth(c))
+        val front = WarrantyCardPdfExporter.frontLayout(c)
+        assertEquals(listOf("2", "3", "4"), digitsIn(front, 139f, 40f, 186f, 79f))
+        assertEquals(listOf("1"), digitsIn(front, 186f, 40f, 232f, 79f))
+        assertEquals(listOf("7"), digitsIn(front, 139f, 79f, 186f, 117f))
+        assertTrue(digitsIn(front, 186f, 79f, 232f, 117f).isEmpty())
+    }
+
+    @Test
+    fun `no teeth selected leaves all quadrants empty`() {
+        val front = WarrantyCardPdfExporter.frontLayout(card(selectedTeeth = "", toothNumbers = ""))
+        assertTrue(digitsIn(front, 139f, 40f, 186f, 79f).isEmpty())
+        assertTrue(digitsIn(front, 186f, 40f, 232f, 79f).isEmpty())
+        assertTrue(digitsIn(front, 139f, 79f, 186f, 117f).isEmpty())
+        assertTrue(digitsIn(front, 186f, 79f, 232f, 117f).isEmpty())
+        assertAllShapesInsidePage(front, "Front")
     }
 
     // ------------------------------------------------------------ bounds (no clipping / no missing text)
@@ -187,12 +270,13 @@ class WarrantyCardPdfLayoutTest {
         val c = card(
             patientName = "Mohammed Abdul Rahman Qureshi Al-Balushi the Third Junior",
             patientAddress = "Flat 1407, Tower B, Skyline Residency Complex, Linking Road, Khar West, Mumbai 400052",
-            toothNumbers = "Upper Right: 1, 2, 3 | Upper Left: 1, 2 | Lower Right: 4, 5, 6 | Lower Left: 6, 7"
+            consultantDoctor = "Dr. Verylongconsultantmiddlename Verylongfamilyname",
+            selectedTeeth = "11,12,13,14,15,16,17,18,21,22,23,24,25,26,27,28,31,38,41,48"
         )
         val front = WarrantyCardPdfExporter.frontLayout(c)
         assertAllShapesInsidePage(front, "Front")
         // The name wraps over two lines rather than being cut off after a few chars
-        val nameLines = front.texts.filter { it.size == 7.3f && it.bold }
+        val nameLines = front.texts.filter { it.size == 6.2f && it.bold }
         assertTrue("patient name should use up to 2 lines", nameLines.isNotEmpty())
     }
 
@@ -208,6 +292,7 @@ class WarrantyCardPdfLayoutTest {
         val c = card(
             patientAddress = "",
             patientPhone = "",
+            selectedTeeth = "",
             toothNumbers = "",
             consultantDoctor = "",
             shade = "",
@@ -228,13 +313,9 @@ class WarrantyCardPdfLayoutTest {
     fun `different warranty durations render with correct labels`() {
         listOf(1, 2, 3, 5, 7, 10, 15, 20).forEach { years ->
             val c = card(warrantyYears = years)
-            val front = frontText(c)
-            val back = backText(c)
-            val expectedBadge = if (years == 1) "1 YEAR" else "$years YEARS"
-            val expectedPeriod = if (years == 1) "1 Year" else "$years Years"
-            assertTrue("front badge missing for $years years", front.contains(expectedBadge))
-            assertTrue("front WARRANTY label missing", front.contains("WARRANTY"))
-            assertTrue("back period missing for $years years", back.contains("($expectedPeriod)"))
+            val expected = if (years == 1) "WARRANTY PERIOD: 1 YEAR" else "WARRANTY PERIOD: $years YEARS"
+            assertTrue("front strip missing for $years years", frontText(c).contains(expected))
+            assertTrue("back strip missing for $years years", backText(c).contains(expected))
             assertAllShapesInsidePage(WarrantyCardPdfExporter.frontLayout(c), "Front")
             assertAllShapesInsidePage(WarrantyCardPdfExporter.backLayout(c), "Back")
         }
@@ -249,30 +330,32 @@ class WarrantyCardPdfLayoutTest {
         // Branding header
         assertTrue(text.contains("Dental Lab Management"))           // lab/application title
         assertTrue(text.contains(WarrantyCardPdfExporter.TAGLINE))   // subtitle
-        assertTrue(text.contains("WC-2026-0001"))                    // card number
-        // Work-type driven main title
-        assertTrue(text.contains("ZIRCONIA CROWN"))
         assertTrue(text.contains("WARRANTY CARD"))
-        // Patient block
-        assertTrue(text.contains("PATIENT"))
-        assertTrue(text.contains(c.patientName))
-        assertTrue(text.contains("12 Hill Road"))                    // address
-        assertTrue(text.contains(c.patientPhone))                    // contact
-        // Clinical details
-        assertTrue(text.contains("TOOTH NUMBER(S)"))
-        assertTrue(text.contains(c.toothNumbers))
-        assertTrue(text.contains("CONSULTANT DR."))
-        assertTrue(text.contains(c.consultantDoctor))
-        assertTrue(text.contains("DATE OF DELIVERY"))
+        assertTrue(text.contains("WC-2026-0001"))                    // card number
+        // Information fields (left column)
+        assertTrue(text.contains("DATE"))
         assertTrue(text.contains(dateFmt.format(Date(c.deliveryDate))))
-        assertTrue(text.contains("WORK ORDER NO."))
+        assertTrue(text.contains("CASE NO."))
         assertTrue(text.contains("NDL-2026-0042"))
-        assertTrue(text.contains("MATERIAL / SHADE"))
+        assertTrue(text.contains("PATIENT NAME"))
+        assertTrue(text.contains(c.patientName))
+        assertTrue(text.contains("ADDRESS"))
+        assertTrue(text.contains("12 Hill Road"))                    // wrapped address
+        assertTrue(text.contains("CONTACT NO."))
+        assertTrue(text.contains(c.patientPhone))
+        assertTrue(text.contains("DENTIST NAME"))
+        assertTrue(text.contains(c.consultantDoctor))
+        assertTrue(text.contains("TYPE OF WORK"))
+        assertTrue(text.contains(c.workType))
         assertTrue(text.contains(c.material))
-        assertTrue(text.contains(c.shade))
-        // Warranty badge + footer
-        assertTrue(text.contains("10 YEARS"))
-        assertTrue(text.contains(WarrantyCardPdfExporter.KEEP_NOTE))
+        // Tooth diagram section + warranty strip
+        assertTrue(text.contains("TOOTH NUMBER(S)"))
+        assertTrue(text.contains("WARRANTY PERIOD: 10 YEARS"))
+        assertTrue(
+            text.contains(
+                "Valid from ${dateFmt.format(Date(c.deliveryDate))} to ${dateFmt.format(Date(c.warrantyExpiryDate))}"
+            )
+        )
     }
 
     @Test
@@ -282,40 +365,21 @@ class WarrantyCardPdfLayoutTest {
         assertTrue(text.contains(c.patientPhone))
     }
 
-    @Test
-    fun `front shows a long name at least up to its first words`() {
-        val c = card(patientName = "Verylongfirstname Verylonglastname Suffixname")
-        val text = frontText(c)
-        assertTrue(text.contains("Verylongfirstname"))
-    }
-
-    @Test
-    fun `front footer uses generic branding with contact only when configured`() {
-        val withPhone = frontText(card())
-        assertTrue(withPhone.contains("Dental Lab Management  |  ${card().labPhone}"))
-        val withoutPhone = frontText(card(labPhone = ""))
-        assertTrue(withoutPhone.contains("Dental Lab Management"))
-        assertFalse(withoutPhone.contains("  |  "))
-    }
-
     // ------------------------------------------------------------ back content completeness
 
     @Test
-    fun `back shows header, title, warranty period, complete terms, care and disclaimer`() {
+    fun `back shows header, warranty period, complete terms, care, contact and disclaimer`() {
         val c = card()
         val text = backText(c)
-        assertTrue(text.contains("DENTAL LAB MANAGEMENT"))           // header brand
+        assertTrue(text.contains("Dental Lab Management"))           // header brand
         assertTrue(text.contains("WC-2026-0001"))                    // card number
-        assertTrue(text.contains("ZIRCONIA CROWN"))
-        assertTrue(text.contains("WARRANTY CARD"))
-        assertTrue(text.contains("WARRANTY PERIOD"))
+        assertTrue(text.contains("WARRANTY PERIOD: 10 YEARS"))
         assertTrue(
             text.contains(
-                "Valid from ${dateFmt.format(Date(c.deliveryDate))} to " +
-                    "${dateFmt.format(Date(c.warrantyExpiryDate))} (10 Years)"
+                "Valid from ${dateFmt.format(Date(c.deliveryDate))} to ${dateFmt.format(Date(c.warrantyExpiryDate))}"
             )
         )
-        assertTrue(text.contains("TERMS & CONDITIONS"))
+        assertTrue(text.contains("WARRANTY TERMS & CONDITIONS"))
         DentalLabRepository.DEFAULT_WARRANTY_TERMS.split('\n').forEach { line ->
             val normalized = line.trim()
             if (normalized.isNotEmpty()) {
@@ -329,16 +393,23 @@ class WarrantyCardPdfLayoutTest {
                 assertTrue("back is missing care line: $normalized", text.contains("• $normalized"))
             }
         }
+        assertTrue(text.contains("Contact: ${c.labPhone}"))
         assertTrue(text.contains("laboratory's actual policy"))
         assertTrue(text.contains("professional dental advice"))
     }
 
     @Test
+    fun `back uses the neutral support line when no lab contact is configured`() {
+        val c = card(labPhone = "", labAddress = "")
+        val text = backText(c)
+        assertTrue(text.contains("For support, contact your prescribing dental clinic."))
+        assertFalse(text.contains("Contact:"))
+    }
+
+    @Test
     fun `back auto-fits longer custom terms without dropping lines`() {
         // 9 numbered lines (~100 chars each) is a realistic long-terms case: the terms
-        // area is ~48pt tall, so the block must SHRINK the font to fit all lines.
-        // (Physically, a CR80 back with period/care/disclaimer sections cannot hold
-        // arbitrarily many lines - beyond the floor the exporter keeps the minimum size.)
+        // area is ~42pt tall, so the block must SHRINK the font to fit all lines.
         val custom = (1..9).joinToString("\n") {
             "$it. Extended warranty condition line number $it describing additional coverage rules and exclusions."
         }
