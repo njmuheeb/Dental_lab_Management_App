@@ -36,6 +36,7 @@ enum class NavDestination(val label: String, val icon: ImageVector) {
     CLINIC_PRICING("Clinic Pricing", Icons.Default.PriceCheck),
     PAYMENTS("Payments & Billing", Icons.Default.Payment),
     REPORTS("Reports & Analytics", Icons.Default.BarChart),
+    WARRANTY_CARDS("Warranty Cards", Icons.Default.WorkspacePremium),
     IMPORT_EXPORT("Import / Export", Icons.Default.SwapVert),
     SETTINGS("Settings & Backup", Icons.Default.Settings)
 }
@@ -56,7 +57,8 @@ fun DentalLabApp(
     // Dedicated secondary screens (opaque overlays above the scaffold)
     var billRequest by remember { mutableStateOf<Long?>(null) }          // monthly bill/invoice
     var statementRequest by remember { mutableStateOf<Long?>(null) }     // full clinic statement
-    var warrantyRequest by remember { mutableStateOf<WorkOrder?>(null) } // warranty card
+    var warrantyRequest by remember { mutableStateOf<WorkOrder?>(null) } // warranty card (from a work order)
+    var warrantyEditCardId by remember { mutableStateOf<Long?>(null) }   // warranty card (existing, from the list screen)
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
@@ -209,7 +211,7 @@ fun DentalLabApp(
                         .padding(16.dp)
                 ) {
                     Text(
-                        text = "Nazneen Dental Lab v1.0.0",
+                        text = "Dental Lab Management v1.0.0",
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(0xFF64748B)
                     )
@@ -332,6 +334,10 @@ fun DentalLabApp(
                     NavDestination.CLINIC_PRICING -> ClinicPricingScreen(viewModel = viewModel)
                     NavDestination.PAYMENTS -> PaymentsScreen(viewModel = viewModel)
                     NavDestination.REPORTS -> ReportsScreen(viewModel = viewModel)
+                    NavDestination.WARRANTY_CARDS -> WarrantyCardsScreen(
+                        viewModel = viewModel,
+                        onEditCard = { warrantyEditCardId = it }
+                    )
                     NavDestination.IMPORT_EXPORT -> ImportExportScreen(viewModel = viewModel)
                     NavDestination.SETTINGS -> SettingsScreen(viewModel = viewModel)
                 }
@@ -341,9 +347,18 @@ fun DentalLabApp(
 
     // Dedicated secondary screens (opaque, composed after the scaffold so their back
     // handling and content take precedence over everything beneath them)
+    warrantyEditCardId?.let { cardId ->
+        WarrantyCardScreen(
+            viewModel = viewModel,
+            cardId = cardId,
+            workOrder = null,
+            onBack = { warrantyEditCardId = null }
+        )
+    }
     warrantyRequest?.let { order ->
         WarrantyCardScreen(
             viewModel = viewModel,
+            cardId = null,
             workOrder = order,
             onBack = { warrantyRequest = null }
         )

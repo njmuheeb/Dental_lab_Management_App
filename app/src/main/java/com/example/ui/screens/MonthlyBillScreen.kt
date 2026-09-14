@@ -152,7 +152,7 @@ fun MonthlyBillScreen(
                 when (kind) {
                     "pdf" -> {
                         val bytes = PdfExporter.buildClinicDocument(st, settings, PdfExporter.Mode.BILL)
-                        val name = "NazneenLab_Bill_${st.clinic.clinicCode}_${selectedYear}-${"%02d".format(selectedMonth)}.pdf"
+                        val name = "DentalLab_Bill_${st.clinic.clinicCode}_${selectedYear}-${"%02d".format(selectedMonth)}.pdf"
                         val file = FileExporter.writeExportFile(context, name, bytes)
                         withContext(Dispatchers.Main) {
                             showExportOptionsDialog(
@@ -167,7 +167,7 @@ fun MonthlyBillScreen(
                     }
                     "xlsx" -> {
                         val bytes = XlsxExporters.statementWorkbook(st, settings, isBill = true)
-                        val name = "NazneenLab_Bill_${st.clinic.clinicCode}_${selectedYear}-${"%02d".format(selectedMonth)}.xlsx"
+                        val name = "DentalLab_Bill_${st.clinic.clinicCode}_${selectedYear}-${"%02d".format(selectedMonth)}.xlsx"
                         val file = FileExporter.writeExportFile(context, name, bytes)
                         withContext(Dispatchers.Main) {
                             showExportOptionsDialog(
@@ -178,7 +178,7 @@ fun MonthlyBillScreen(
                     }
                     "csv" -> {
                         val csv = CsvExporters.clinicStatementCsv(st)
-                        val name = "NazneenLab_Bill_${st.clinic.clinicCode}_${selectedYear}-${"%02d".format(selectedMonth)}.csv"
+                        val name = "DentalLab_Bill_${st.clinic.clinicCode}_${selectedYear}-${"%02d".format(selectedMonth)}.csv"
                         val file = FileExporter.writeExportFile(context, name, csv.toByteArray())
                         withContext(Dispatchers.Main) {
                             showExportOptionsDialog(

@@ -15,7 +15,7 @@ relate to each other, and how migrations work.
 | Database engine | SQLite (via Android) |
 | Access layer | Room 2.7.0 (`androidx.room`) with KSP code generation |
 | Database file | `dental_lab_management.db` (app-private internal storage) |
-| Schema version | **6** |
+| Schema version | **7** |
 | Threading | DAOs are suspend functions / `Flow`, called off the main thread through the repository |
 | Architecture | Single `AppDatabase`, one DAO per entity, unified access via `DentalLabRepository` |
 
@@ -137,7 +137,8 @@ This is the core billing model of the app — combined monthly payments are neve
 | --- | --- | --- |
 | `id` | INTEGER PK | auto-generated |
 | `workOrderId` | INTEGER | **unique, nullable** — FK → work_orders.id (`NULL` = standalone card) |
-| `clinicId`, `clinicName` | INTEGER / TEXT | **FK → clinics.id** + name snapshot |
+| `workOrderNumber` | TEXT | snapshot of `work_orders.jobNumber` (`''` for standalone cards) |
+| `clinicId`, `clinicName` | INTEGER / TEXT | **FK → clinics.id** + name snapshot (0/'' when a manual card has no link) |
 | `patientId`, `patientName` | INTEGER / TEXT | **FK → patients.id** + name snapshot |
 | `patientAddress`, `patientPhone` | TEXT | printed on the card |
 | `workType`, `material`, `shade`, `toothNumbers` | TEXT | work details (teeth in quadrant notation) |
@@ -147,6 +148,8 @@ This is the core billing model of the app — combined monthly payments are neve
 | `warrantyExpiryDate` | INTEGER | recomputed on every save (`deliveryDate + years`) |
 | `cardNumber` | TEXT | format `WC-YYYY-NNNN` |
 | `terms` | TEXT | warranty terms text (editable, printed on the card back) |
+| `careInstructions` | TEXT | care recommendations (editable, printed on the card back) |
+| `notes` | TEXT | internal note — stored on record, deliberately **not printed** |
 | `labName`, `labAddress`, `labPhone` | TEXT | lab identity printed on the card |
 | `createdAt`, `updatedAt`, `syncId`, `pendingSync` | — | audit + sync |
 
@@ -160,6 +163,7 @@ pages: page 1 front, page 2 back.
 | `labName`, `phone`, `whatsapp`, `email`, `address`, `city` | TEXT | lab identity used on bills, statements and warranty cards |
 | `currencySymbol` | TEXT | default `₹` |
 | `defaultTurnaroundDays` | INTEGER | default 5, applied to new work orders |
+| `defaultWarrantyYears` | INTEGER | default 10, applied to new warranty cards (per-card override available) |
 | `defaultPaymentMethod` | TEXT | default `UPI` |
 | `themeMode` | TEXT | `System` / `Light` / `Dark` |
 | `syncEnabled`, `syncUrl`, `syncSecret`, `lastSyncAt` | — | optional Google Sheets sync configuration (user-entered; never compiled in) |
@@ -230,6 +234,7 @@ never falls back to destructive migration, so user data is preserved across upgr
 | 3 → 4 | New `warranty_cards` table |
 | 4 → 5 | `warranty_cards.workOrderId` becomes nullable (standalone cards allowed; table rebuild) |
 | 5 → 6 | `warranty_cards.clinicName` snapshot column added and backfilled from `clinics`; stored rows carrying the retired default lab branding are replaced with the generic name |
+| 6 → 7 | `warranty_cards` gains `workOrderNumber` (backfilled from work orders), `careInstructions` (backfilled with the default care recommendations) and `notes`; `lab_settings` gains `defaultWarrantyYears` |
 
 The database file was renamed from a previous internal name to
 `dental_lab_management.db`; on first launch after the rename the app copies the old file

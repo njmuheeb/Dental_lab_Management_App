@@ -40,7 +40,7 @@ import kotlinx.coroutines.launch
         SyncQueueEntry::class,
         WarrantyCard::class
     ],
-    version = 5,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -300,14 +300,92 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v5 -> v6: warranty_cards gains a clinicName snapshot column so the card keeps
+         * the clinic name it was issued for (mirrors work_orders.clinicName). The old
+         * default lab branding is also scrubbed from previously stored rows so it can
+         * no longer surface in the UI or in generated PDFs after the rename. Additive
+         * only - no other data is touched.
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `warranty_cards` ADD COLUMN `clinicName` TEXT NOT NULL DEFAULT ''")
+                db.execSQL(
+                    """
+                    UPDATE `warranty_cards` SET `clinicName` = COALESCE(
+                        (SELECT `clinics`.`name` FROM `clinics` WHERE `clinics`.`id` = `warranty_cards`.`clinicId`),
+                        ''
+                    )
+                    """.trimIndent()
+                )
+                // Privacy: replace the previously seeded default lab name / email with the
+                // generic public name. User-entered custom values are left untouched.
+                db.execSQL("UPDATE `warranty_cards` SET `labName` = 'DENTAL LAB MANAGEMENT' WHERE `labName` = 'NAZNEEN DENTAL LAB'")
+                db.execSQL("UPDATE `lab_settings` SET `labName` = 'DENTAL LAB MANAGEMENT' WHERE `labName` = 'NAZNEEN DENTAL LAB'")
+                db.execSQL("UPDATE `lab_settings` SET `email` = '' WHERE `email` = 'nazneendentallab@gmail.com'")
+            }
+        }
+
+        /**
+         * v6 -> v7: warranty cards gain a workOrderNumber snapshot plus printed
+         * care-instructions and internal notes columns (all additive, backfilled where
+         * possible); lab_settings gains the configurable default warranty period.
+         */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `warranty_cards` ADD COLUMN `workOrderNumber` TEXT NOT NULL DEFAULT ''")
+                db.execSQL(
+                    """
+                    UPDATE `warranty_cards` SET `workOrderNumber` = COALESCE(
+                        (SELECT `work_orders`.`jobNumber` FROM `work_orders` WHERE `work_orders`.`id` = `warranty_cards`.`workOrderId`),
+                        ''
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("ALTER TABLE `warranty_cards` ADD COLUMN `careInstructions` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `warranty_cards` ADD COLUMN `notes` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `lab_settings` ADD COLUMN `defaultWarrantyYears` INTEGER NOT NULL DEFAULT 10")
+                // Give existing cards the default care recommendations so the redesigned
+                // card back is complete after the upgrade.
+                db.execSQL(
+                    """
+                    UPDATE `warranty_cards` SET `careInstructions` =
+                        'Brush and floss daily around the restoration.' || CHAR(10) ||
+                        'Avoid biting hard objects; use a night guard if you grind your teeth.' || CHAR(10) ||
+                        'Visit your dentist every six months.'
+                    WHERE `careInstructions` = ''
+                    """.trimIndent()
+                )
+            }
+        }
+
+        // Privacy: the database file no longer carries the old lab branding in its name.
+        private const val DB_NAME = "dental_lab_management.db"
+        private const val LEGACY_DB_NAME = "nazneen_dental_lab.db"
+
         fun getDatabase(context: Context, scope: CoroutineScope): AppDatabase {
             return INSTANCE ?: synchronized(this) {
+                // One-time migration of the legacy database file (data-preserving rename).
+                // If the new file does not exist yet but the old one does, copy it (plus
+                // its WAL/SHM sidecars) so existing local data survives the rename.
+                val newDb = context.getDatabasePath(DB_NAME)
+                if (!newDb.exists()) {
+                    val oldDb = context.getDatabasePath(LEGACY_DB_NAME)
+                    if (oldDb.exists()) {
+                        listOf("", "-wal", "-shm").forEach { suffix ->
+                            val src = java.io.File(oldDb.parentFile, LEGACY_DB_NAME + suffix)
+                            if (src.exists()) {
+                                src.copyTo(java.io.File(newDb.parentFile, DB_NAME + suffix), overwrite = false)
+                            }
+                        }
+                    }
+                }
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "nazneen_dental_lab.db"
+                    DB_NAME
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .addCallback(DatabaseCallback(scope))
                 .build()
                 INSTANCE = instance

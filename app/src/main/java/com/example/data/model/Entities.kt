@@ -164,7 +164,9 @@ data class Payment(
 data class WarrantyCard(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val workOrderId: Long? = null, // null = standalone manually-created card
+    val workOrderNumber: String = "", // snapshot of work_orders.jobNumber ("" for standalone cards)
     val clinicId: Long,
+    val clinicName: String = "",   // snapshot of the clinic name at card creation
     val patientId: Long,
     val labName: String,
     val labAddress: String = "",
@@ -182,6 +184,8 @@ data class WarrantyCard(
     val warrantyExpiryDate: Long = 0L, // calculated from deliveryDate + warrantyYears on save
     val cardNumber: String = "",
     val terms: String = "",
+    val careInstructions: String = "", // printed on the card back ("care recommendations")
+    val notes: String = "",            // internal note, kept on record but NOT printed on the card
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     val syncId: String = UUID.randomUUID().toString(),
@@ -191,14 +195,15 @@ data class WarrantyCard(
 @Entity(tableName = "lab_settings")
 data class LabSettings(
     @PrimaryKey val id: Int = 1,
-    val labName: String = "NAZNEEN DENTAL LAB",
+    val labName: String = "DENTAL LAB MANAGEMENT",
     val phone: String = "+91 98765 43210",
     val whatsapp: String = "+91 98765 43210",
-    val email: String = "nazneendentallab@gmail.com",
+    val email: String = "",
     val address: String = "Building 4, Healthcare Complex, S.V. Road",
     val city: String = "Mumbai, Maharashtra",
     val currencySymbol: String = "₹",
     val defaultTurnaroundDays: Int = 5,
+    val defaultWarrantyYears: Int = 10,
     val defaultPaymentMethod: String = "UPI",
     val themeMode: String = "System",
     val updatedAt: Long = System.currentTimeMillis(),

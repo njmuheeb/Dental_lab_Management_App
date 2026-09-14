@@ -279,29 +279,62 @@ are auto-generated when the CSV cell is blank.
 
 ## J. Warranty Cards
 
-**What it does:** printable patient warranty cards for a work order, stored in the
-database and editable at any time.
+**What it does:** database-backed, printable patient warranty cards, managed from a
+dedicated screen (sidebar → **Warranty Cards**) with search, filters, preview, editing,
+printing and deletion.
 
-**Workflow:**
+### Warranty Cards screen
 
-1. Open a work order's details dialog (Work Orders screen) → **Warranty Card**.
-2. The card is created as an editable draft pre-filled from the order, patient, clinic
-   and lab settings (card number `WC-YYYY-NNNN`, default 10-year warranty).
-3. Edit any field: lab identity, patient name/address/phone, consultant doctor, work
-   type/material, tooth numbers, shade, delivery/issue date, warranty period
-   (**1, 2, 3, 5, 7, 10, 15 or 20 years** — the expiry date is always recomputed as
-   delivery + duration), and the warranty terms text.
-4. Preview front/back, **Save Card**, and **Print / Export PDF**.
-5. The PDF is **exactly two CR80/ID-1 card-sized pages (85.60 × 54 mm)** — page 1 front
-   (title, lab name, card number, patient block, validity badge, work details grid),
-   page 2 back (full terms & conditions, lab contact, card info, signature line). It can
-   be shared, printed (front/back on card stock) or saved to Downloads.
+- **Create New Warranty Card** opens a dialog with two modes:
+  - *From Work Order* — searchable list of work orders that do not have a card yet;
+    selecting one creates a card pre-filled from the order, patient, clinic and lab
+    settings.
+  - *Manual Entry* — standalone card, optionally linked to an existing clinic and
+    patient (dropdowns); remaining details are typed by hand.
+- **Search** by patient name, clinic, card number or work order number.
+- **Filters:** clinic, delivery year, and status chips (All / Active / Expired — status
+  is derived from the expiry date vs today).
+- Each card shows: card number (`WC-YYYY-NNNN`), Active/Expired badge, patient • clinic,
+  work type • teeth, delivery date, warranty period and expiry, and the linked work
+  order number.
+- **Actions:** View (front/back preview dialog), Edit, PDF, Print, Delete (with
+  confirmation).
 
-**Connections:** each card is linked to its work order (one card per order), clinic and
-patient; reopening an order's warranty card loads the stored card, never a new draft.
+### Editing a card
 
-**Limitations:** cards are reached through their work order (no standalone card list
-yet); warranty cards are not part of the Google Sheets sync.
+The editor (also opened from a work order's details dialog via **Warranty Card**) edits
+every printed field: lab identity (name/address/phone), patient name/address/phone,
+consultant doctor, work type, material, tooth numbers, shade, delivery/issue date,
+warranty period (**1, 2, 3, 5, 7, 10, 15 or 20 years** — the expiry date is always
+recomputed as delivery + duration), warranty terms & conditions, and care
+recommendations. *Additional notes* are stored on the card but deliberately not
+printed. New cards default to the **Default Warranty Period** from Settings (10 years
+unless changed).
+
+### Card PDF (front / back)
+
+The export is **exactly two CR80/ID-1 card-sized pages (85.60 × 54 mm)**:
+
+- **Page 1 — front:** navy brand header (lab name, "Precision | Quality | Care"
+  tagline, tooth glyph, card number), work-type title ("{WORK TYPE} WARRANTY CARD"),
+  blue warranty badge ("N YEARS"), patient panel (name / address / contact) and a
+  details column (tooth numbers, consultant doctor, delivery date, work order number,
+  material / shade). Footer shows generic branding with the lab phone only if
+  configured.
+- **Page 2 — back:** header, centered card title, warranty period strip ("Valid from …
+  to … (N Years)"), numbered **terms & conditions** (editable, auto-shrunk to fit),
+  **care recommendations** (bulleted) and a policy disclaimer footer.
+
+The PDF can be shared, printed (front/back on card stock — the app shows a
+"Print at Actual Size (100%)" reminder) or saved to Downloads. A preview dialog with
+Front/Back toggle and Generate PDF / Print / Close buttons is available before export.
+
+**Connections:** each card is linked to its work order (one card per order), clinic
+and patient; reopening a work order's card loads the stored card, never a new draft.
+
+**Limitations:** manual-entry cards that skip the clinic/patient dropdowns are stored
+without record links (details live only on the card); internal notes are not printed;
+warranty cards are not part of the Google Sheets sync.
 
 ---
 

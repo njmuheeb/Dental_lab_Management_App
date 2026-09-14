@@ -47,9 +47,11 @@ the optional Google Sheets mirror.
   previous-balance carry-forward, exportable as **PDF (printable), Excel and CSV**.
 - **Reports & analytics** — financial overview (billed / collected / due, recovery
   rate), per-clinic and per-work-type breakdowns.
-- **Warranty cards** — database-backed, editable patient warranty cards, exported as an
-  **exactly-two-page CR80/ID-1 (85.60 × 53.98 mm) PDF** with a front and back side,
-  ready for front/back printing on card stock.
+- **Warranty cards** — a dedicated Warranty Cards screen (sidebar) with search and
+  clinic/year/Active-Expired filters: create cards from an existing work order or by
+  manual entry, preview both sides, and export an **exactly-two-page CR80/ID-1
+  (85.60 × 53.98 mm) PDF** (front + back) ready for front/back printing on card stock
+  at Actual Size.
 - **Import / Export** — XLSX ledgers (work orders, clinic directory, payments), CSV
   exports, CSV import for clinics and work orders, and a per-clinic work-history Excel
   export.

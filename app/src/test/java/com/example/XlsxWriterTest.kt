@@ -23,7 +23,7 @@ class XlsxWriterTest {
 
     private fun buildWorkbook(rows: Int): ByteArray {
         val all = mutableListOf<Row>()
-        all += Row(listOf(Cell.Text("NAZNEEN DENTAL LAB")), RowStyle.TITLE)
+        all += Row(listOf(Cell.Text("DENTAL LAB MANAGEMENT")), RowStyle.TITLE)
         all += Row(listOf(Cell.Text("MONTHLY STATEMENT - June 2026")), RowStyle.SUBTITLE)
         all += Row((0..10).map { Cell.Text("H$it") }, RowStyle.HEADER)
         for (i in 0 until rows) {

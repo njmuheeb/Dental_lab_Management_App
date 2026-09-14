@@ -152,21 +152,44 @@ receipt in the payment history list.
 **Reports:** open **Reports & Analytics** and switch between the **Financial**,
 **Clinics** and **Work Types** tabs (all-time figures).
 
-## 11. Creating and printing a warranty card
+## 11. Creating and printing warranty cards
 
-1. Open **Work Orders** and tap the order you want to issue a card for.
-2. Tap the orange **Warranty Card** button.
-3. The card opens pre-filled with the patient, work and lab details. Adjust anything:
-   patient address/phone, consultant doctor, delivery date, warranty period
-   (1–20 years) and the printed terms. The expiry date is recalculated automatically.
-4. Use the **Front / Back** chips to preview both sides of the card.
-5. Tap **Save Card** to store it, then **Print / Export PDF**.
-6. The PDF contains **exactly two card-sized pages** (85.6 × 54 mm — Aadhaar/CR80 card
-   size): page 1 is the front, page 2 is the back. Choose **Print** to print it
-   front/back on card stock, or **Share** / **Save to Downloads**.
+Warranty cards live in their own screen: open the side drawer → **Warranty Cards**.
 
-The card stays linked to the work order — reopening it later loads the saved card for
-editing or reprinting.
+**Create a card:**
+
+1. Tap **Create New Warranty Card**.
+2. Choose how to start:
+   - **From Work Order** — search and tap a work order (orders that already have a
+     card are not listed). The card opens pre-filled with the patient, work and lab
+     details.
+   - **Manual Entry** — optionally pick a clinic and a patient so the card is linked
+     to your records, then fill the rest by hand in the editor.
+3. In the editor, check or adjust: patient name/address/phone, consultant doctor, work
+   type, material, tooth numbers, shade, delivery date, warranty period (1–20 years —
+   the expiry date is recalculated automatically), the printed terms and the care
+   recommendations. *Additional notes* stay on record but are never printed.
+4. Tap **Save Card**.
+
+**Preview, print and export:**
+
+1. Use the **Front / Back** chips in the editor (or **View** on a list row) to preview
+   both sides — the preview shows the actual saved data.
+2. The preview dialog offers **Generate PDF**, **Print** and **Close**; the list rows
+   also have direct **PDF** and **Print** buttons. You can still open a card from a
+   work order's details dialog (**Warranty Card** button).
+3. The PDF contains **exactly two card-sized pages** (85.6 × 54 mm — Aadhaar/CR80 card
+   size): page 1 is the front, page 2 is the back.
+4. When printing, choose **front/back** printing on card stock and set the print
+   scaling to **Actual Size / 100%** — do not "fit to page", or the card will be
+   rescaled to the paper size.
+
+**Find cards:** use the search box (patient, clinic, card number or work order
+number) or the clinic / delivery-year / Active-Expired filters. Deleting a card asks
+for confirmation and cannot be undone.
+
+**Default warranty period:** Settings & Backup → *Default Warranty Period (Years)*
+(10 years by default) is applied to every new card.
 
 ## 12. Import / Export
 

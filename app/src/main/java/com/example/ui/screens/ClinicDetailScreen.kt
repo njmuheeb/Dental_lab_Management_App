@@ -174,7 +174,7 @@ fun ClinicDetailScreen(
                 val bytes = XlsxExporters.workOrdersLedgerWorkbook(clinicOrders, labSettings)
                 val file = FileExporter.writeExportFile(
                     context,
-                    "NazneenLab_${clinic.clinicCode}_WorkHistory.xlsx",
+                    "DentalLab_${clinic.clinicCode}_WorkHistory.xlsx",
                     bytes
                 )
                 withContext(Dispatchers.Main) {

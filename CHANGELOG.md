@@ -7,6 +7,24 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Warranty Cards screen** (sidebar entry): searchable, filterable list of all issued
+  cards (search by patient, clinic, card or work order number; filters by clinic,
+  delivery year and Active/Expired status) with view (front/back preview dialog),
+  edit, generate PDF, print and delete actions — plus a create dialog that starts a
+  card from an existing work order (prefilled) or as manual entry optionally linked
+  to an existing clinic and patient.
+- Warranty card editor: work order number, care recommendations (printed on the card
+  back) and internal notes fields.
+- Configurable **default warranty period** in Settings → Laboratory Identity, used for
+  new cards (per-card override unchanged).
+- Professional card design: brand header with tagline and tooth glyph, work-type
+  driven title ("{WORK TYPE} WARRANTY CARD"), warranty duration badge, patient panel,
+  and a back side with warranty period strip, numbered terms & conditions, care
+  recommendations and a policy disclaimer footer.
+- "Print at Actual Size (100%)" guidance in the warranty card UI and export messages.
+
 ### Fixed
 
 - **Warranty card PDF generation** — the front-side detail grid previously rendered as

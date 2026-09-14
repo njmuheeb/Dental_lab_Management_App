@@ -277,6 +277,10 @@ class SyncOutboxTest {
             execSQL("ALTER TABLE work_orders ADD COLUMN paidAmount REAL NOT NULL DEFAULT 0")
             execSQL("ALTER TABLE payments ADD COLUMN workOrderId INTEGER NOT NULL DEFAULT 1")
             execSQL("ALTER TABLE payments ADD COLUMN patientId INTEGER")
+            // lab_settings is never rebuilt by the 2->7 migration chain, but the fresh
+            // database above was created with the CURRENT (v7) schema - remove the
+            // column that MIGRATION_6_7 adds so the migration path is exercised properly.
+            execSQL("ALTER TABLE lab_settings DROP COLUMN defaultWarrantyYears")
             execSQL(
                 """
                 INSERT INTO work_orders (jobNumber, entryDate, expectedDeliveryDate, actualDeliveryDate,
@@ -302,9 +306,13 @@ class SyncOutboxTest {
         }
         bootDb.close()
 
-        // Step 3: reopen with Room -> MIGRATION_2_3 + MIGRATION_3_4 execute and Room validates
+        // Step 3: reopen with Room -> MIGRATION_2_3 .. MIGRATION_6_7 execute and Room validates
         val migrated = Room.databaseBuilder(context, AppDatabase::class.java, dbName)
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
+            .addMigrations(
+                AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3,
+                AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5,
+                AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7
+            )
             .allowMainThreadQueries()
             .build()
 

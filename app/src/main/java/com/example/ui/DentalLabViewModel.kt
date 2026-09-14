@@ -215,13 +215,35 @@ class DentalLabViewModel(application: Application) : AndroidViewModel(applicatio
         repository.getClinicStatementForRange(clinicId, start, endExclusive)
 
     // --- Warranty Cards ---
+
+    val warrantyCards = repository.allWarrantyCards
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     suspend fun getOrCreateWarrantyCard(order: com.example.data.model.WorkOrder): com.example.data.model.WarrantyCard? =
         repository.getOrCreateWarrantyCard(order)
+
+    suspend fun getWarrantyCardById(id: Long): com.example.data.model.WarrantyCard? =
+        repository.getWarrantyCardById(id)
+
+    /** Creates a standalone card (optionally linked to an existing clinic/patient). */
+    suspend fun createManualWarrantyCard(
+        clinic: com.example.data.model.Clinic?,
+        patient: com.example.data.model.Patient?
+    ): com.example.data.model.WarrantyCard? =
+        repository.createManualWarrantyCard(clinic, patient)
 
     fun saveWarrantyCard(card: com.example.data.model.WarrantyCard, onDone: () -> Unit = {}) {
         viewModelScope.launch {
             repository.saveWarrantyCard(card)
             showMessage("Warranty card ${card.cardNumber} saved")
+            onDone()
+        }
+    }
+
+    fun deleteWarrantyCard(card: com.example.data.model.WarrantyCard, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.deleteWarrantyCard(card)
+            showMessage("Warranty card ${card.cardNumber} deleted")
             onDone()
         }
     }

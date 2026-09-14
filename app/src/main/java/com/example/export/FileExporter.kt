@@ -87,13 +87,18 @@ object FileExporter {
         }
     }
 
-    /** Prints a PDF file through the Android print framework. */
-    fun printPdf(context: Context, file: File, jobName: String) {
+    /**
+     * Prints a PDF file through the Android print framework.
+     *
+     * @param pageCount exact page count when known (e.g. 2 for a warranty card), so the
+     * print adapter reports it in PrintDocumentInfo. Use -1 when unknown.
+     */
+    fun printPdf(context: Context, file: File, jobName: String, pageCount: Int = -1) {
         val printManager = context.getSystemService(Context.PRINT_SERVICE) as? PrintManager ?: return
-        printManager.print(jobName, PdfPrintAdapter(file), null)
+        printManager.print(jobName, PdfPrintAdapter(file, pageCount), null)
     }
 
-    private class PdfPrintAdapter(private val file: File) : PrintDocumentAdapter() {
+    private class PdfPrintAdapter(private val file: File, private val pageCount: Int) : PrintDocumentAdapter() {
         override fun onLayout(
             oldAttributes: android.print.PrintAttributes?,
             newAttributes: android.print.PrintAttributes,
@@ -105,12 +110,12 @@ object FileExporter {
                 callback.onLayoutCancelled()
                 return
             }
-            callback.onLayoutFinished(
-                PrintDocumentInfo.Builder(file.name)
-                    .setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
-                    .build(),
-                newAttributes != oldAttributes
-            )
+            val info = PrintDocumentInfo.Builder(file.name)
+                .setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
+            if (pageCount > 0) {
+                info.setPageCount(pageCount)
+            }
+            callback.onLayoutFinished(info.build(), newAttributes != oldAttributes)
         }
 
         override fun onWrite(

@@ -174,7 +174,7 @@ fun ClinicStatementScreen(
                 when (kind) {
                     "pdf" -> {
                         val bytes = PdfExporter.buildClinicDocument(st, settings, PdfExporter.Mode.STATEMENT)
-                        val name = "NazneenLab_Statement_${st.clinic.clinicCode}_${fileSafePeriod(st)}.pdf"
+                        val name = "DentalLab_Statement_${st.clinic.clinicCode}_${fileSafePeriod(st)}.pdf"
                         val file = FileExporter.writeExportFile(context, name, bytes)
                         withContext(Dispatchers.Main) {
                             showExportOptionsDialog(
@@ -187,7 +187,7 @@ fun ClinicStatementScreen(
                     }
                     "xlsx" -> {
                         val bytes = XlsxExporters.statementWorkbook(st, settings, isBill = false)
-                        val name = "NazneenLab_Statement_${st.clinic.clinicCode}_${fileSafePeriod(st)}.xlsx"
+                        val name = "DentalLab_Statement_${st.clinic.clinicCode}_${fileSafePeriod(st)}.xlsx"
                         val file = FileExporter.writeExportFile(context, name, bytes)
                         withContext(Dispatchers.Main) {
                             showExportOptionsDialog(
@@ -635,7 +635,8 @@ fun showExportOptionsDialog(
     mime: String,
     title: String,
     message: String,
-    viewModel: DentalLabViewModel
+    viewModel: DentalLabViewModel,
+    pageCount: Int = -1
 ) {
     android.app.AlertDialog.Builder(context)
         .setTitle(title)
@@ -645,7 +646,7 @@ fun showExportOptionsDialog(
         }
         .setNeutralButton(if (mime == FileExporter.MIME_PDF) "Print" else "Save to Downloads") { _, _ ->
             if (mime == FileExporter.MIME_PDF) {
-                FileExporter.printPdf(context, file, file.name)
+                FileExporter.printPdf(context, file, file.name, pageCount)
             } else {
                 val ok = FileExporter.saveToDownloads(context, file, mime, file.name)
                 viewModel.showMessage(if (ok) "Saved to Downloads" else "Could not save to Downloads - use Share instead")

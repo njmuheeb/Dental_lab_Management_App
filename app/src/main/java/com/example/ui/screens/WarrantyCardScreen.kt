@@ -1,8 +1,6 @@
 package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,21 +46,16 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.WarrantyCard
@@ -71,15 +64,14 @@ import com.example.data.repository.DentalLabRepository
 import com.example.export.FileExporter
 import com.example.export.WarrantyCardPdfExporter
 import com.example.ui.DentalLabViewModel
+import com.example.ui.components.WarrantyCardBackPreview
+import com.example.ui.components.WarrantyCardFrontPreview
 import com.example.ui.theme.DentalBlue
-import com.example.ui.theme.DentalBlueLight
-import com.example.ui.theme.Navy800
 import com.example.ui.theme.Navy900
 import com.example.ui.theme.StatusGreen
 import com.example.ui.theme.StatusOrange
 import com.example.ui.theme.StatusRed
 import com.example.ui.theme.TextMuted
-import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -91,17 +83,23 @@ import java.util.Locale
 import java.util.TimeZone
 
 /**
- * Create / edit a patient WARRANTY CARD for a specific work order and print or export it
- * as an Aadhaar-sized (CR80, 85.6 x 54 mm) two-sided PDF (page 1 = front, page 2 = back).
- * The card is stored in the database, linked to the work order, and stays editable.
+ * Create / edit a patient WARRANTY CARD and print or export it as a CR80
+ * (85.6 x 54 mm) two-sided PDF (page 1 = front, page 2 = back).
+ *
+ * Two entry points:
+ *  - [workOrder] set: opened from the work order details dialog; loads the existing
+ *    card for that order or creates an editable prefilled draft.
+ *  - [cardId] set: opened from the Warranty Cards screen; loads that stored card.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WarrantyCardScreen(
     viewModel: DentalLabViewModel,
-    workOrder: WorkOrder,
+    cardId: Long? = null,
+    workOrder: WorkOrder? = null,
     onBack: () -> Unit
 ) {
+    require(cardId != null || workOrder != null) { "cardId or workOrder is required" }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -111,10 +109,13 @@ fun WarrantyCardScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var exportBusy by remember { mutableStateOf(false) }
 
-    // Load or create the draft card for this work order
-    LaunchedEffect(workOrder.id) {
+    // Load by id (list screen entry) or get-or-create by work order (order entry)
+    LaunchedEffect(cardId, workOrder?.id) {
         loading = true
-        card = withContext(Dispatchers.IO) { viewModel.getOrCreateWarrantyCard(workOrder) }
+        card = withContext(Dispatchers.IO) {
+            if (workOrder != null) viewModel.getOrCreateWarrantyCard(workOrder)
+            else viewModel.getWarrantyCardById(cardId!!)
+        }
         loading = false
     }
     BackHandler { onBack() }
@@ -140,8 +141,10 @@ fun WarrantyCardScreen(
                         file = file,
                         mime = FileExporter.MIME_PDF,
                         title = "Warranty card ready",
-                        message = "Saved ${file.name} - page 1: front, page 2: back. Use Print for front-and-back card printing.",
-                        viewModel = viewModel
+                        message = "Saved ${file.name} - 2 card pages (85.6 x 54 mm): page 1 front, page 2 back. " +
+                            WarrantyCardPdfExporter.PRINT_NOTE,
+                        viewModel = viewModel,
+                        pageCount = WarrantyCardPdfExporter.PAGE_COUNT
                     )
                 }
             } catch (e: Exception) {
@@ -159,7 +162,10 @@ fun WarrantyCardScreen(
                     Column {
                         Text("Warranty Card", fontWeight = FontWeight.Bold, color = Navy900)
                         Text(
-                            "${workOrder.jobNumber} • ${workOrder.patientName}",
+                            card?.let { c ->
+                                if (c.workOrderNumber.isNotBlank()) "${c.workOrderNumber} • ${c.patientName.ifBlank { "New card" }}"
+                                else c.patientName.ifBlank { c.cardNumber }
+                            } ?: "Loading...",
                             fontSize = 11.sp, color = TextSecondary
                         )
                     }
@@ -229,25 +235,27 @@ fun WarrantyCardScreen(
                                 }
                             }
                             if (showFront) {
-                                WarrantyCardFrontPreview(
-                                    card = c,
-                                    formatDate = dateFmt::format
-                                )
+                                WarrantyCardFrontPreview(card = c, formatDate = dateFmt::format)
                             } else {
-                                WarrantyCardBackPreview(
-                                    card = c,
-                                    formatDate = dateFmt::format
-                                )
+                                WarrantyCardBackPreview(card = c, formatDate = dateFmt::format)
                             }
                             Text(
-                                "Print size: 85.6 x 54 mm (Aadhaar/CR80 card) - PDF page 1 front, page 2 back",
-                                fontSize = 10.sp, color = TextMuted
+                                "CR80 card 85.6 x 54 mm - PDF page 1 front, page 2 back. " +
+                                    WarrantyCardPdfExporter.PRINT_NOTE,
+                                fontSize = 10.sp, color = StatusOrange
                             )
                         }
                     }
 
                     // ---------------- Card details form ----------------
                     Text("CARD DETAILS", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Navy900)
+                    OutlinedTextField(
+                        value = c.workOrderNumber.ifBlank { "-" },
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Warranty Card / Work Order Number") },
+                        singleLine = true, modifier = Modifier.fillMaxWidth()
+                    )
                     OutlinedTextField(
                         value = c.labName,
                         onValueChange = { card = c.copy(labName = it) },
@@ -294,7 +302,13 @@ fun WarrantyCardScreen(
                     OutlinedTextField(
                         value = c.workType,
                         onValueChange = { card = c.copy(workType = it) },
-                        label = { Text("Work Type / Material") },
+                        label = { Text("Work Type / Restoration") },
+                        singleLine = true, modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = c.material,
+                        onValueChange = { card = c.copy(material = it) },
+                        label = { Text("Material") },
                         singleLine = true, modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
@@ -351,9 +365,23 @@ fun WarrantyCardScreen(
                     OutlinedTextField(
                         value = c.terms,
                         onValueChange = { card = c.copy(terms = it) },
-                        label = { Text("Warranty Terms / Notes") },
+                        label = { Text("Warranty Terms & Conditions (printed on card back)") },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 4
+                    )
+                    OutlinedTextField(
+                        value = c.careInstructions,
+                        onValueChange = { card = c.copy(careInstructions = it) },
+                        label = { Text("Care Recommendations (printed on card back)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3
+                    )
+                    OutlinedTextField(
+                        value = c.notes,
+                        onValueChange = { card = c.copy(notes = it) },
+                        label = { Text("Additional Notes (internal - not printed)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2
                     )
 
                     // ---------------- Actions ----------------
@@ -409,158 +437,5 @@ fun WarrantyCardScreen(
         ) {
             DatePicker(state = pickerState)
         }
-    }
-}
-
-// ---------------------------------------------------------------- card previews (CR80 proportion)
-
-@Composable
-fun WarrantyCardFrontPreview(card: WarrantyCard, formatDate: (Long) -> String) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(214.dp)
-            .background(
-                Brush.verticalGradient(listOf(Color(0xFF0F172A), Navy800)),
-                RoundedCornerShape(12.dp)
-            )
-            .border(1.dp, DentalBlue.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-            .padding(12.dp)
-    ) {
-        // Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("DENTAL WARRANTY CARD", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                Text(card.labName, color = DentalBlueLight, fontWeight = FontWeight.Bold, fontSize = 10.sp, maxLines = 1)
-            }
-            Text(card.cardNumber, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Patient + validity badge
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("PATIENT", color = TextMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                Text(card.patientName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1)
-                if (card.patientPhone.isNotBlank()) {
-                    Text(card.patientPhone, color = TextMuted, fontSize = 9.sp)
-                }
-            }
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .background(StatusOrange, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Text("VALID", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                Text("${card.warrantyYears} YEARS", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Work details grid
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                PreviewField("WORK / MATERIAL", card.workType)
-                PreviewField("SHADE", card.shade.ifBlank { "-" })
-                PreviewField("DELIVERED ON", formatDate(card.deliveryDate))
-            }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                PreviewField("TOOTH NUMBER(S)", card.toothNumbers.ifBlank { "-" })
-                PreviewField("CONSULTANT DOCTOR", card.consultantDoctor.ifBlank { "-" })
-                PreviewField("VALID UNTIL", formatDate(card.warrantyExpiryDate))
-            }
-        }
-        Spacer(modifier = Modifier.weight(1f))
-        // Footer strip
-        Column {
-            HorizontalDivider(color = DentalBlue.copy(alpha = 0.5f))
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(card.labPhone, color = DentalBlueLight, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                Text("Keep this card safe for warranty claims", color = TextMuted, fontSize = 8.sp)
-            }
-        }
-    }
-}
-
-@Composable
-fun WarrantyCardBackPreview(card: WarrantyCard, formatDate: (Long) -> String) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(214.dp)
-            .background(Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
-            .border(1.dp, DentalBlue.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-            .padding(12.dp)
-    ) {
-        // Header band
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(DentalBlue, RoundedCornerShape(6.dp))
-                .padding(horizontal = 10.dp, vertical = 5.dp)
-        ) {
-            Text("WARRANTY TERMS & CONDITIONS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            card.terms,
-            color = TextPrimary, fontSize = 9.sp, lineHeight = 12.sp,
-            maxLines = 9,
-            modifier = Modifier.weight(1f, fill = false)
-        )
-        Spacer(modifier = Modifier.weight(1f))
-
-        HorizontalDivider(color = TextMuted.copy(alpha = 0.3f))
-        Spacer(modifier = Modifier.height(6.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(card.labName, color = Navy900, fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1)
-                if (card.labAddress.isNotBlank()) {
-                    Text(card.labAddress, color = TextSecondary, fontSize = 9.sp, maxLines = 2)
-                }
-                if (card.labPhone.isNotBlank()) {
-                    Text("Call: ${card.labPhone}", color = TextSecondary, fontSize = 9.sp)
-                }
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                Text("Card No: ${card.cardNumber}", color = TextSecondary, fontSize = 9.sp)
-                Text("Issued: ${formatDate(card.deliveryDate)}", color = TextSecondary, fontSize = 9.sp)
-                Spacer(modifier = Modifier.height(8.dp))
-                Box(
-                    modifier = Modifier
-                        .width(110.dp)
-                        .height(1.dp)
-                        .background(TextPrimary)
-                )
-                Text("Authorised Signatory", color = TextMuted, fontSize = 8.sp, textAlign = TextAlign.Center)
-            }
-        }
-    }
-}
-
-@Composable
-private fun PreviewField(label: String, value: String) {
-    Column {
-        Text(label, color = TextMuted, fontSize = 7.5.sp, fontWeight = FontWeight.Bold)
-        Text(
-            value,
-            color = Color.White,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1
-        )
     }
 }

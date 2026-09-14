@@ -138,7 +138,7 @@ fun ImportExportScreen(
                         showExportDialog = true
                     },
                     onExportXlsx = {
-                        exportXlsx("NazneenLab_WorkOrders_Ledger.xlsx") {
+                        exportXlsx("DentalLab_WorkOrders_Ledger.xlsx") {
                             XlsxExporters.workOrdersLedgerWorkbook(workOrders, labSettings)
                         }
                     }
@@ -158,7 +158,7 @@ fun ImportExportScreen(
                         showExportDialog = true
                     },
                     onExportXlsx = {
-                        exportXlsx("NazneenLab_Clinic_Directory.xlsx") {
+                        exportXlsx("DentalLab_Clinic_Directory.xlsx") {
                             XlsxExporters.clinicDirectoryWorkbook(clinics, workOrders, payments)
                         }
                     }
@@ -178,7 +178,7 @@ fun ImportExportScreen(
                         showExportDialog = true
                     },
                     onExportXlsx = {
-                        exportXlsx("NazneenLab_Payments_Ledger.xlsx") {
+                        exportXlsx("DentalLab_Payments_Ledger.xlsx") {
                             XlsxExporters.paymentsLedgerWorkbook(payments, clinics)
                         }
                     }

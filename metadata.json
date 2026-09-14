@@ -1,5 +1,5 @@
 {
-  "name": "Nazneen Dental Lab",
+  "name": "Dental Lab Management",
   "description": "Professional offline-first dental laboratory management system for work orders, clinics, patients, visual odontogram, pricing, and payments.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

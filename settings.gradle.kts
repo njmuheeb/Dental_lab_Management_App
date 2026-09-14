@@ -22,7 +22,7 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Nazneen Dental Lab"
+rootProject.name = "Dental Lab Management"
 
 
 include(":app")

@@ -240,12 +240,25 @@ class DentalLabRepository(private val database: AppDatabase) {
     // --- Warranty Cards ---
 
     companion object {
+        /** Generic, editable default terms printed on the warranty card back. */
         const val DEFAULT_WARRANTY_TERMS =
-            "1. This warranty covers manufacturing defects of the delivered dental restoration only.\n" +
-            "2. Regular dental check-ups every 6 months are mandatory; failure voids the warranty.\n" +
-            "3. Damage due to trauma, misuse, negligence or third-party alteration is not covered.\n" +
-            "4. The warranty is non-transferable and applies to the original patient only.\n" +
-            "5. Present this original card along with the invoice for any warranty claim."
+            "1. Covers eligible manufacturing defects of the restoration from the delivery date.\n" +
+            "2. Valid only for the original patient; non-transferable.\n" +
+            "3. Not covered: accidents, misuse, bruxism, poor oral hygiene, unauthorized repairs.\n" +
+            "4. Six-monthly dental check-ups are mandatory to keep the warranty valid.\n" +
+            "5. For claims, contact the laboratory/clinic with this card and the original invoice.\n" +
+            "6. Final claim assessment rests with the laboratory per its warranty policy."
+
+        /** Generic default care recommendations printed on the card back. */
+        const val DEFAULT_CARE_INSTRUCTIONS =
+            "Brush and floss daily around the restoration.\n" +
+            "Avoid biting hard objects; use a night guard if you grind your teeth.\n" +
+            "Visit your dentist every six months."
+
+        /** Disclaimer printed on the card back - never a universal legal guarantee. */
+        const val WARRANTY_DISCLAIMER =
+            "Warranty terms are subject to the laboratory's actual policy and applicable agreements. " +
+            "This card is not a substitute for professional dental advice."
 
         /** Expiry date = delivery date + [years] full calendar years. */
         fun warrantyExpiry(deliveryDate: Long, years: Int): Long {
@@ -254,6 +267,22 @@ class DentalLabRepository(private val database: AppDatabase) {
             cal.add(Calendar.YEAR, years)
             return cal.timeInMillis
         }
+    }
+
+    /** All warranty cards, newest first (drives the Warranty Cards screen). */
+    val allWarrantyCards: Flow<List<WarrantyCard>> = warrantyDao.getAllWarrantyCards()
+
+    suspend fun getWarrantyCardById(id: Long): WarrantyCard? =
+        withContext(Dispatchers.IO) { warrantyDao.getById(id) }
+
+    suspend fun deleteWarrantyCard(card: WarrantyCard) = withContext(Dispatchers.IO) {
+        warrantyDao.delete(card)
+    }
+
+    /** Sequential card number, e.g. "WC-2026-0007" (count-based like job numbers). */
+    private suspend fun nextWarrantyCardNumber(): String {
+        val count = warrantyDao.getCount()
+        return String.format("WC-%d-%04d", Calendar.getInstance().get(Calendar.YEAR), count + 1)
     }
 
     /**
@@ -268,14 +297,13 @@ class DentalLabRepository(private val database: AppDatabase) {
         val patient = patientDao.getPatientById(workOrder.patientId)
         val settings = labSettingsDao.getSettingsDirect() ?: LabSettings()
         val delivery = workOrder.actualDeliveryDate ?: workOrder.expectedDeliveryDate
-        val years = 10
-        val count = warrantyDao.getCount()
-        val cal = Calendar.getInstance().apply { timeInMillis = delivery }
-        val cardNumber = String.format("WC-%d-%04d", cal.get(Calendar.YEAR), count + 1)
+        val years = settings.defaultWarrantyYears.coerceIn(1, 50)
 
         val draft = WarrantyCard(
             workOrderId = workOrder.id,
+            workOrderNumber = workOrder.jobNumber,
             clinicId = workOrder.clinicId,
+            clinicName = clinic?.name ?: workOrder.clinicName,
             patientId = workOrder.patientId,
             labName = settings.labName,
             labAddress = listOf(settings.address, settings.city).filter { it.isNotBlank() }.joinToString(", "),
@@ -291,12 +319,47 @@ class DentalLabRepository(private val database: AppDatabase) {
             deliveryDate = delivery,
             warrantyYears = years,
             warrantyExpiryDate = warrantyExpiry(delivery, years),
-            cardNumber = cardNumber,
-            terms = DEFAULT_WARRANTY_TERMS
+            cardNumber = nextWarrantyCardNumber(),
+            terms = DEFAULT_WARRANTY_TERMS,
+            careInstructions = DEFAULT_CARE_INSTRUCTIONS
         )
         val id = warrantyDao.insert(draft)
         warrantyDao.getById(id)
     }
+
+    /**
+     * Creates a standalone (manually entered) warranty card. Optionally linked to an
+     * existing clinic/patient when the user picked them; otherwise the patient details
+     * are typed by hand in the editor and the ids stay 0 (no record linkage).
+     */
+    suspend fun createManualWarrantyCard(clinic: Clinic?, patient: Patient?): WarrantyCard =
+        withContext(Dispatchers.IO) {
+            val settings = labSettingsDao.getSettingsDirect() ?: LabSettings()
+            val delivery = System.currentTimeMillis()
+            val years = settings.defaultWarrantyYears.coerceIn(1, 50)
+            val draft = WarrantyCard(
+                workOrderId = null,
+                workOrderNumber = "",
+                clinicId = clinic?.id ?: 0L,
+                clinicName = clinic?.name ?: "",
+                patientId = patient?.id ?: 0L,
+                labName = settings.labName,
+                labAddress = listOf(settings.address, settings.city).filter { it.isNotBlank() }.joinToString(", "),
+                labPhone = settings.phone,
+                patientName = patient?.name ?: "",
+                patientAddress = "",
+                patientPhone = patient?.phone ?: "",
+                consultantDoctor = clinic?.dentistName?.takeIf { it.isNotBlank() }?.let { "Dr. $it" } ?: "",
+                deliveryDate = delivery,
+                warrantyYears = years,
+                warrantyExpiryDate = warrantyExpiry(delivery, years),
+                cardNumber = nextWarrantyCardNumber(),
+                terms = DEFAULT_WARRANTY_TERMS,
+                careInstructions = DEFAULT_CARE_INSTRUCTIONS
+            )
+            val id = warrantyDao.insert(draft)
+            warrantyDao.getById(id)!!
+        }
 
     /** Inserts or updates a card; the expiry date is always recomputed from delivery + years. */
     suspend fun saveWarrantyCard(card: WarrantyCard): Long = withContext(Dispatchers.IO) {

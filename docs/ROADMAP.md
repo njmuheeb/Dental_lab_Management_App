@@ -20,8 +20,6 @@ implemented yet — everything currently available in the app is documented in
   selectable document colors, and editable warranty terms templates.
 - 🟡 **Expanded reporting** — date-range revenue reports, per-work-type and per-doctor
   breakdowns, and exportable dashboard summaries.
-- 🟡 **Warranty card list screen** — browse, search, reprint and manage all issued
-  warranty cards in one place (cards are currently reached through their work order).
 
 ## Medium term (planned / under consideration)
 

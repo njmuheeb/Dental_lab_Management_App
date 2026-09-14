@@ -47,6 +47,7 @@ fun SettingsScreen(
     var address by remember(labSettings) { mutableStateOf(labSettings.address) }
     var city by remember(labSettings) { mutableStateOf(labSettings.city) }
     var turnaroundDaysText by remember(labSettings) { mutableStateOf(labSettings.defaultTurnaroundDays.toString()) }
+    var warrantyYearsText by remember(labSettings) { mutableStateOf(labSettings.defaultWarrantyYears.toString()) }
     var currencySymbol by remember(labSettings) { mutableStateOf(labSettings.currencySymbol) }
 
     // Sync settings local state
@@ -155,6 +156,13 @@ fun SettingsScreen(
                                 singleLine = true
                             )
                         }
+                        OutlinedTextField(
+                            value = warrantyYearsText,
+                            onValueChange = { warrantyYearsText = it },
+                            label = { Text("Default Warranty Period (Years)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
 
                         Button(
                             onClick = {
@@ -166,6 +174,7 @@ fun SettingsScreen(
                                         address = address.trim(),
                                         city = city.trim(),
                                         defaultTurnaroundDays = turnaroundDaysText.toIntOrNull() ?: 5,
+                                        defaultWarrantyYears = (warrantyYearsText.toIntOrNull() ?: 10).coerceIn(1, 50),
                                         currencySymbol = currencySymbol.trim()
                                     )
                                 )
@@ -475,7 +484,7 @@ fun SettingsScreen(
                 Button(
                     onClick = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clip = ClipData.newPlainText("NazneenDentalLab_Backup", backupJsonString)
+                        val clip = ClipData.newPlainText("DentalLabManagement_Backup", backupJsonString)
                         clipboard.setPrimaryClip(clip)
                         viewModel.showMessage("Backup copied to clipboard!")
                         showBackupDialog = false
