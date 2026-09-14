@@ -1,11 +1,11 @@
 /**
- * Nazneen Dental Lab - Google Sheets Sync (Apps Script Web App)
+ * Dental Lab Management - Google Sheets Sync (Apps Script Web App)
  * ----------------------------------------------------------------
  * OPTIONAL mirror of the app's offline Room database into your own Google Sheet.
  * The Android app remains the source of truth; this script only receives pushed rows.
  *
  * SETUP
- *  1. Create a new Google Sheet (any name, e.g. "Nazneen Dental Lab Backup").
+ *  1. Create a new Google Sheet (any name, e.g. "Dental Lab Management Backup").
  *  2. Extensions > Apps Script, delete the sample code and paste this file.
  *  3. Set the SECRET constant below (any long random string).
  *  4. Deploy > New deployment > type "Web app":
@@ -122,7 +122,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return json_({ status: 'ok', message: 'Nazneen Dental Lab sync endpoint is alive. Use POST.' });
+  return json_({ status: 'ok', message: 'Dental Lab Management sync endpoint is alive. Use POST.' });
 }
 
 function findSyncIdColumn_(sheet) {

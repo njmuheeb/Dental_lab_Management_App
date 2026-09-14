@@ -1,4 +1,4 @@
-# Google Sheets Sync (Optional) — Nazneen Dental Lab
+# Google Sheets Sync (Optional) — Dental Lab Management
 
 The app is **100% offline-first**. Room/SQLite on the device is the only source of truth and
 every feature (dashboard, clinic details, statements, bills, PDF/XLSX/CSV exports) works with
@@ -8,7 +8,7 @@ no internet connection. Google Sheets sync is an **optional mirror** you can ena
 
 | Concern | Implementation |
 | --- | --- |
-| Local data | Room database (`nazneen_dental_lab.db`), version 2 — primary source |
+| Local data | Room database (`dental_lab_management.db`) — primary source |
 | Unique IDs | `syncId` (UUID) on every clinic, patient, work type, clinic rate, work order and payment |
 | Change tracking | `pendingSync` flag set on every write; `updatedAt`/`createdAt` timestamps |
 | Deletes | Tombstone entries in the `sync_queue` outbox table (a deleted row cannot carry a flag) |
@@ -18,9 +18,9 @@ no internet connection. Google Sheets sync is an **optional mirror** you can ena
 
 ## Setup
 
-1. Create a Google Sheet, e.g. *Nazneen Dental Lab Backup*.
+1. Create a Google Sheet, e.g. *Dental Lab Management Backup*.
 2. **Extensions → Apps Script**, paste the contents of
-   [`docs/google-apps-script/nazneen-dental-sync.gs`](google-apps-script/nazneen-dental-sync.gs).
+   [`docs/google-apps-script/dental-lab-sync.gs`](google-apps-script/dental-lab-sync.gs).
 3. Change the `SECRET` constant at the top of the script to a long random string.
 4. **Deploy → New deployment → Web app**:
    - *Execute as:* **Me**
